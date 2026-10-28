@@ -1,8 +1,8 @@
 import 'dart:convert';
+import 'dart:js_util' as js_util;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 void main() => runApp(const GagwanaApp());
 
@@ -75,9 +75,9 @@ class _HomePageState extends State<HomePage> {
   int tab = 0;
   String ward = 'All wards', status = 'All records';
   final List<PlatformFile> selectedPdfs = [];
-  final apiUrl = TextEditingController(text: 'http://127.0.0.1:8080');
-  final apiToken = TextEditingController();
   bool uploading = false;
+  bool databaseReady = false;
+  int localRecordCount = 0;
   String importStatus = '';
   final List<Map<String, dynamic>> scannedBatches = [];
 
@@ -97,8 +97,6 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     search.dispose();
-    apiUrl.dispose();
-    apiToken.dispose();
     super.dispose();
   }
 
@@ -123,62 +121,74 @@ class _HomePageState extends State<HomePage> {
     setState(() => selectedPdfs.removeWhere((item) => item.name == file.name));
   }
 
-  Future<void> uploadSelectedPdfs() async {
-    final baseUrl = apiUrl.text.trim().replaceFirst(RegExp(r'/+$'), '');
-    final token = apiToken.text.trim();
-    if (baseUrl.isEmpty || token.isEmpty) {
-      setState(() => importStatus = 'Enter the backend URL and API token before uploading.');
-      return;
-    }
-    setState(() {
-      uploading = true;
-      importStatus = 'Connecting to backend and scanning selected PDFs…';
-      scannedBatches.clear();
-    });
-    var succeeded = 0;
-    final errors = <String>[];
-    for (final file in List<PlatformFile>.from(selectedPdfs)) {
+  Future<dynamic> _sqliteCall(String method, [List<dynamic> args = const []]) async {
+    final sqlite = js_util.getProperty<Object?>(js_util.globalThis, 'gagwanaSqlite');
+    if (sqlite == null) throw Exception('Local SQLite module did not load. Reload the app and check the internet connection.');
+    final result = js_util.callMethod<Object?>(sqlite, method, args);
+    if (result != null) {
       try {
-        final bytes = file.bytes;
-        if (bytes == null || bytes.isEmpty) {
-          errors.add('${file.name}: file bytes are unavailable. Re-select the PDF and try again.');
-          continue;
-        }
-        final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/imports/pdf'));
-        request.headers['Authorization'] = 'Bearer $token';
-        request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: file.name));
-        final streamed = await request.send().timeout(const Duration(minutes: 5));
-        final response = await http.Response.fromStream(streamed);
-        Map<String, dynamic> payload = {};
-        try {
-          final decoded = jsonDecode(response.body);
-          if (decoded is Map<String, dynamic>) payload = decoded;
-        } catch (_) {}
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          if (payload['duplicate_upload'] == true) {
-            errors.add('${file.name}: this exact PDF was already scanned (batch ${payload['existing_batch_id']}).');
-          } else {
-            scannedBatches.add(payload);
-            succeeded++;
-          }
-        } else {
-          final detail = payload['detail']?.toString() ?? response.reasonPhrase ?? 'HTTP ${response.statusCode}';
-          errors.add('${file.name}: $detail');
-        }
-        if (mounted) setState(() {});
-      } catch (error) {
-        errors.add('${file.name}: cannot reach backend. Confirm it is running, the URL is correct, and CORS allows this localhost origin. Details: ${error.runtimeType}.');
+        return await js_util.promiseToFuture<Object?>(result);
+      } catch (_) {
+        return result;
       }
     }
-    if (!mounted) return;
-    setState(() {
-      uploading = false;
-      importStatus = [
-        'Scanned successfully: $succeeded of ${selectedPdfs.length} PDF(s).',
-        if (errors.isNotEmpty) errors.join('\n'),
-        if (succeeded > 0) 'Page text is staged for review. This does not yet save parsed voter records.',
-      ].join('\n\n');
-    });
+    return result;
+  }
+
+  Future<void> initializeLocalDatabase() async {
+    setState(() { uploading = true; importStatus = 'Opening local SQLite database…'; });
+    try {
+      await _sqliteCall('init');
+      final stats = jsonDecode((await _sqliteCall('stats')).toString()) as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        databaseReady = true;
+        localRecordCount = (stats['records'] as num?)?.toInt() ?? 0;
+        importStatus = 'Local SQLite is ready. $localRecordCount voter record(s) stored in this browser.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => importStatus = 'Could not open local SQLite: $error');
+    } finally {
+      if (mounted) setState(() => uploading = false);
+    }
+  }
+
+  Future<void> exportLocalDatabase() async {
+    try {
+      await _sqliteCall('exportDb');
+      if (mounted) setState(() => importStatus = 'SQLite backup exported as voter_records.db.');
+    } catch (error) {
+      if (mounted) setState(() => importStatus = 'Could not export SQLite backup: $error');
+    }
+  }
+
+  Future<void> importLocalDatabase() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom, allowedExtensions: ['db', 'sqlite', 'sqlite3'],
+      allowMultiple: false, withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final bytes = result.files.single.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      setState(() => importStatus = 'Could not read the selected database file. Please select it again.');
+      return;
+    }
+    setState(() { uploading = true; importStatus = 'Importing SQLite backup…'; });
+    try {
+      await _sqliteCall('importDb', [base64Encode(bytes)]);
+      final stats = jsonDecode((await _sqliteCall('stats')).toString()) as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        databaseReady = true;
+        localRecordCount = (stats['records'] as num?)?.toInt() ?? 0;
+        importStatus = 'Imported SQLite backup. $localRecordCount voter record(s) are available in this browser.';
+      });
+    } catch (error) {
+      if (mounted) setState(() => importStatus = 'Could not import SQLite backup: $error');
+    } finally {
+      if (mounted) setState(() => uploading = false);
+    }
   }
 
   @override
@@ -334,36 +344,40 @@ class _HomePageState extends State<HomePage> {
     Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Local import backend', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text('Start the Python backend separately before uploading. For localhost debugging, use http://127.0.0.1:8080. Enter the VOTER_API_TOKEN configured on the backend.'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: apiUrl,
-              keyboardType: TextInputType.url,
-              decoration: const InputDecoration(labelText: 'Backend URL', hintText: 'http://127.0.0.1:8080'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: apiToken,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Backend API token', hintText: 'VOTER_API_TOKEN'),
-            ),
-          ],
-        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Local SQLite database', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text('No Python server is required. The database is stored in this browser using IndexedDB and can be exported as a SQLite .db file for backup or transfer. Each browser/device has its own local copy.'),
+          const SizedBox(height: 10),
+          Row(children: [
+            Icon(databaseReady ? Icons.check_circle : Icons.storage, color: databaseReady ? Colors.green : Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(child: Text(databaseReady ? 'Database ready • $localRecordCount voter records' : 'Database not opened yet')),
+          ]),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            FilledButton.icon(
+              onPressed: uploading ? null : initializeLocalDatabase,
+              icon: const Icon(Icons.storage), label: const Text('Open local database')),
+            OutlinedButton.icon(
+              onPressed: uploading ? null : exportLocalDatabase,
+              icon: const Icon(Icons.download), label: const Text('Export .db backup')),
+            OutlinedButton.icon(
+              onPressed: uploading ? null : importLocalDatabase,
+              icon: const Icon(Icons.upload_file), label: const Text('Import .db backup')),
+          ]),
+        ]),
       ),
     ),
     const SizedBox(height: 14),
     FilledButton.icon(
-      onPressed: selectedPdfs.isEmpty || uploading ? null : uploadSelectedPdfs,
-      icon: uploading
-          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-          : const Icon(Icons.document_scanner),
-      label: Text(uploading ? 'Uploading and scanning…' : 'Upload PDFs and scan'),
+      onPressed: selectedPdfs.isEmpty || uploading
+          ? null
+          : () => setState(() => importStatus = 'PDF upload is selected, but browser-only PDF text/OCR parsing and voter-row import are not implemented yet. The local SQLite database is available for storage and backup.'),
+      icon: const Icon(Icons.document_scanner),
+      label: Text(uploading ? 'Working…' : 'Scan selected PDFs'),
     ),
+    const SizedBox(height: 10),
     if (importStatus.isNotEmpty) ...[
       const SizedBox(height: 12),
       Card(
