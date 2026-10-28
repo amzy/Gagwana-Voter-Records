@@ -1,0 +1,9 @@
+{
+  "name": "Gagwana Voter Records",
+  "short_name": "Gagwana",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#080D14",
+  "theme_color": "#1769FF",
+  "description": "Gagwana voter records search and PDF review UI."
+}
