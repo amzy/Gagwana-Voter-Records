@@ -14,7 +14,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import pdfplumber
 import pytesseract
@@ -33,7 +33,7 @@ app = FastAPI(title="Gagwana Voter Records API", version="1.0.0")
 bearer = HTTPBearer(auto_error=False)
 
 
-def require_api_token(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)) -> None:
+def require_api_token(credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer)) -> None:
     expected = os.environ.get("VOTER_API_TOKEN", "").strip()
     if not expected:
         raise HTTPException(503, "Server admin must configure VOTER_API_TOKEN before using the API.")
@@ -144,13 +144,13 @@ class ImportRecord(BaseModel):
     relative_name: str = ""
     relation_type: str = ""
     house_no: str = ""
-    age: int | None = None
+    age: Optional[int] = None
     gender: str = ""
-    photo_path: str | None = None
+    photo_path: Optional[str] = None
     source_pdf: str = ""
     source_page: int | None = None
     raw_text: str = ""
-    confidence: float | None = Field(default=None, ge=0, le=1)
+    confidence: Optional[float] = Field(default=None, ge=0, le=1)
     deleted_mark_detected: bool = False
     deleted_evidence: str = ""
     review_required: bool = False
