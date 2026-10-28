@@ -13,7 +13,7 @@ class _GagwanaAppState extends State<GagwanaApp> {
   ThemeMode mode = ThemeMode.system;
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'गागवाना • मतदाता सूची',
+    title: 'Gagwana Voter Records',
     debugShowCheckedModeBanner: false,
     themeMode: mode,
     theme: _theme(Brightness.light),
@@ -70,19 +70,19 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final search = TextEditingController();
   int tab = 0;
-  String ward = 'सभी वार्ड', status = 'सभी रिकॉर्ड';
-  String? pdfName;
+  String ward = 'All wards', status = 'All records';
+  final List<PlatformFile> selectedPdfs = [];
 
   List<Voter> get filtered => records.where((v) {
     final q = search.text.trim().toLowerCase();
     final textMatch = q.isEmpty || v.id.toLowerCase().contains(q) ||
       v.name.toLowerCase().contains(q) || v.relative.toLowerCase().contains(q) ||
       '${v.serial}'.contains(q);
-    final wardMatch = ward == 'सभी वार्ड' || v.ward == ward;
-    final statusMatch = status == 'सभी रिकॉर्ड' ||
-      (status == 'केवल सक्रिय' && v.status == Status.active) ||
-      (status == 'केवल Flagged' && v.status == Status.flagged) ||
-      (status == 'केवल Deleted' && v.status == Status.deleted);
+    final wardMatch = ward == 'All wards' || v.ward == ward;
+    final statusMatch = status == 'All records' ||
+      (status == 'Active only' && v.status == Status.active) ||
+      (status == 'Flagged only' && v.status == Status.flagged) ||
+      (status == 'Deleted only' && v.status == Status.deleted);
     return textMatch && wardMatch && statusMatch;
   }).toList();
 
@@ -91,9 +91,21 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> pickPdf() async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom, allowedExtensions: ['pdf']);
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+      allowMultiple: true,
+      withData: false,
+    );
     if (result == null || result.files.isEmpty) return;
-    setState(() { pdfName = result.files.single.name; tab = 1; });
+    setState(() {
+      final existingNames = selectedPdfs.map((file) => file.name).toSet();
+      selectedPdfs.addAll(result.files.where((file) => !existingNames.contains(file.name)));
+      tab = 1;
+    });
+  }
+
+  void removePdf(PlatformFile file) {
+    setState(() => selectedPdfs.removeWhere((item) => item.name == file.name));
   }
 
   @override
@@ -106,8 +118,8 @@ class _HomePageState extends State<HomePage> {
           CircleAvatar(backgroundColor: Color(0xFFFF626B), child: Icon(Icons.groups_rounded, color: Colors.white)),
           SizedBox(width: 10),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('गागवाना', style: TextStyle(fontWeight: FontWeight.w800)),
-            Text('मतदाता सूची', style: TextStyle(fontSize: 12)),
+            Text('Gagwana', style: TextStyle(fontWeight: FontWeight.w800)),
+            Text('Voter Records', style: TextStyle(fontSize: 12)),
           ]),
         ]),
         actions: [IconButton(
@@ -121,8 +133,8 @@ class _HomePageState extends State<HomePage> {
           selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v),
           labelType: NavigationRailLabelType.all,
           destinations: const [
-            NavigationRailDestination(icon: Icon(Icons.search), label: Text('खोजें')),
-            NavigationRailDestination(icon: Icon(Icons.picture_as_pdf), label: Text('PDF / OCR')),
+            NavigationRailDestination(icon: Icon(Icons.search), label: Text('Search')),
+            NavigationRailDestination(icon: Icon(Icons.picture_as_pdf), label: Text('Import PDFs')),
           ]),
         Expanded(child: Center(child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
@@ -131,39 +143,39 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: wide ? null : NavigationBar(
         selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.search), label: 'खोजें'),
-          NavigationDestination(icon: Icon(Icons.picture_as_pdf), label: 'PDF / OCR'),
+          NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
+          NavigationDestination(icon: Icon(Icons.picture_as_pdf), label: 'Import PDFs'),
         ]),
       floatingActionButton: tab == 0 ? FloatingActionButton.extended(
-        onPressed: pickPdf, icon: const Icon(Icons.upload_file), label: const Text('PDF अपलोड')) : null,
+        onPressed: pickPdf, icon: const Icon(Icons.upload_file), label: const Text('Upload PDFs')) : null,
     );
   }
 
   Widget searchScreen() => ListView(padding: const EdgeInsets.fromLTRB(16,12,16,90), children: [
-    Text('मतदाता खोजें', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+    Text('Search voter records', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
     const SizedBox(height: 6),
-    const Text('नाम, पिता/पति का नाम, वोटर ID या क्रम संख्या खोजें'),
+    const Text('Search by voter name, relative name, voter ID, or serial number. Voter data remains in Hindi.'),
     const SizedBox(height: 16),
     TextField(controller: search, onChanged: (_) => setState(() {}),
-      decoration: InputDecoration(hintText: 'नाम या वोटर ID खोजें…', prefixIcon: const Icon(Icons.search),
+      decoration: InputDecoration(hintText: 'Search name, relative, voter ID, or serial…', prefixIcon: const Icon(Icons.search),
         suffixIcon: search.text.isEmpty ? null : IconButton(onPressed: () { search.clear(); setState(() {}); }, icon: const Icon(Icons.close)))),
     const SizedBox(height: 10),
     Row(children: [
-      Expanded(child: DropdownButtonFormField<String>(initialValue: ward, decoration: const InputDecoration(labelText: 'वार्ड'),
-        items: ['सभी वार्ड', ...List.generate(13,(i)=>(i+1).toString().padLeft(2,'0'))]
-          .map((s)=>DropdownMenuItem(value:s,child:Text(s=='सभी वार्ड'?s:'वार्ड $s'))).toList(),
-        onChanged:(v)=>setState(()=>ward=v??'सभी वार्ड'))),
+      Expanded(child: DropdownButtonFormField<String>(initialValue: ward, decoration: const InputDecoration(labelText: 'Ward'),
+        items: ['All wards', ...List.generate(13,(i)=>(i+1).toString().padLeft(2,'0'))]
+          .map((s)=>DropdownMenuItem(value:s,child:Text(s=='All wards'?s:'Ward $s'))).toList(),
+        onChanged:(v)=>setState(()=>ward=v??'All wards'))),
       const SizedBox(width: 10),
-      Expanded(child: DropdownButtonFormField<String>(initialValue: status, decoration: const InputDecoration(labelText: 'स्थिति'),
-        items: ['सभी रिकॉर्ड','केवल सक्रिय','केवल Flagged','केवल Deleted']
+      Expanded(child: DropdownButtonFormField<String>(initialValue: status, decoration: const InputDecoration(labelText: 'Record status'),
+        items: ['All records','Active only','Flagged only','Deleted only']
           .map((s)=>DropdownMenuItem(value:s,child:Text(s))).toList(),
-        onChanged:(v)=>setState(()=>status=v??'सभी रिकॉर्ड'))),
+        onChanged:(v)=>setState(()=>status=v??'All records'))),
     ]),
     const SizedBox(height: 16),
-    Row(children: [Text('परिणाम', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-      const Spacer(), Text('${filtered.length} रिकॉर्ड')]),
+    Row(children: [Text('Results', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+      const Spacer(), Text('${filtered.length} records')]),
     const SizedBox(height: 8),
-    if (filtered.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(24), child: Center(child: Text('कोई रिकॉर्ड नहीं मिला')))),
+    if (filtered.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No records found')))),
     ...filtered.map(recordCard),
   ]);
 
@@ -178,9 +190,9 @@ class _HomePageState extends State<HomePage> {
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [Expanded(child: Text(v.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize:16))),
           badge(v.status)]),
-        const SizedBox(height: 4), Text('पिता/पति: ${v.relative}'),
+        const SizedBox(height: 4), Text('Relative: ${v.relative}'),
         const SizedBox(height: 5), Text('ID: ${v.id}', style: Theme.of(context).textTheme.bodySmall),
-        Text('वार्ड ${v.ward} • क्रम संख्या ${v.serial} • आयु ${v.age}',
+        Text('Ward ${v.ward} • Serial ${v.serial} • Age ${v.age}',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ])),
       const Icon(Icons.chevron_right),
@@ -189,7 +201,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget badge(Status s) {
     final c = s == Status.active ? const Color(0xFF16A765) : s == Status.flagged ? const Color(0xFFF59E0B) : const Color(0xFFEF4444);
-    final label = s == Status.active ? 'सक्रिय' : s == Status.flagged ? 'Flagged' : 'Deleted';
+    final label = s == Status.active ? 'Active' : s == Status.flagged ? 'Flagged' : 'Deleted';
     return Container(padding: const EdgeInsets.symmetric(horizontal:9,vertical:5),
       decoration: BoxDecoration(color:c.withValues(alpha:.14),borderRadius:BorderRadius.circular(30)),
       child: Text(label, style: TextStyle(color:c,fontWeight:FontWeight.w700,fontSize:11)));
@@ -198,16 +210,16 @@ class _HomePageState extends State<HomePage> {
   Widget detailSheet(Voter v) => SafeArea(child: Padding(
     padding: EdgeInsets.fromLTRB(20,8,20,MediaQuery.viewInsetsOf(context).bottom+24),
     child: SingleChildScrollView(child: Column(crossAxisAlignment:CrossAxisAlignment.start,children: [
-      Text('मतदाता विवरण', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+      Text('Voter details', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
       const SizedBox(height:16),
       const Center(child: CircleAvatar(radius:42, child: Icon(Icons.person,size:48))),
       const SizedBox(height:10),
       Center(child: Text(v.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold))),
       const SizedBox(height:14),
-      detailRow('वोटर ID',v.id), detailRow('क्रम संख्या','${v.serial}'), detailRow('वार्ड',v.ward),
-      detailRow('नाम',v.name), detailRow('पिता/पति का नाम',v.relative), detailRow('आयु','${v.age}'),
-      detailRow('स्थिति',v.status == Status.active ? 'सक्रिय' : v.status == Status.flagged ? 'Flagged — सत्यापन आवश्यक' : 'Deleted — PDF mark'),
-      detailRow('स्रोत','${v.pdf}, पृष्ठ ${v.page}'),
+      detailRow('Voter ID',v.id), detailRow('Serial number','${v.serial}'), detailRow('Ward',v.ward),
+      detailRow('Name',v.name), detailRow('Relative name',v.relative), detailRow('Age','${v.age}'),
+      detailRow('Status',v.status == Status.active ? 'Active' : v.status == Status.flagged ? 'Flagged — review required' : 'Deleted — explicit PDF mark'),
+      detailRow('Source','${v.pdf}, page ${v.page}'),
     ])),
   ));
 
@@ -216,31 +228,42 @@ class _HomePageState extends State<HomePage> {
       Expanded(child: Text(value, style: const TextStyle(fontWeight:FontWeight.w600)))]));
 
   Widget importScreen() => ListView(padding: const EdgeInsets.all(16), children: [
-    Text('PDF अपलोड / रिकॉर्ड अपडेट', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.w800)),
+    Text('Import voter-list PDFs', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.w800)),
     const SizedBox(height:8),
-    const Text('PDF चुनें, OCR परिणामों की समीक्षा करें, और पुष्टि के बाद ही मास्टर सूची अपडेट करें।'),
+    const Text('Select multiple PDFs. Review OCR results, resolve duplicates, and confirm changes before updating the master records.'),
     const SizedBox(height:18),
     Card(child: InkWell(onTap:pickPdf, borderRadius:BorderRadius.circular(20), child: Padding(
       padding: const EdgeInsets.all(28), child: Column(children: [
         Icon(Icons.cloud_upload_rounded,size:52,color:Theme.of(context).colorScheme.primary),
         const SizedBox(height:12),
-        Text(pdfName ?? 'वोटर सूची PDF चुनें',style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold)),
-        const SizedBox(height:6), const Text('यहाँ टैप करके PDF चुनें'),
+        Text(selectedPdfs.isEmpty ? 'Select voter-list PDFs' : '${selectedPdfs.length} PDF file(s) selected',style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold)),
+        const SizedBox(height:6), const Text('Tap to select one or multiple PDF files'),
       ])))),
     const SizedBox(height:16),
     Card(child: Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Text('OCR सेटिंग',style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.bold)),
-      const ListTile(leading:Icon(Icons.translate),title:Text('हिंदी — Devanagari / Mangal Unicode')),
-      const SwitchListTile(value:true,onChanged:null,title:Text('PDF से वोटर फोटो निकालें')),
-      const SwitchListTile(value:true,onChanged:null,title:Text('स्पष्ट DELETED mark पहचानें')),
-      const SwitchListTile(value:true,onChanged:null,title:Text('अनिश्चित OCR को Flag करें')),
+      Text('Import settings',style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.bold)),
+      const ListTile(leading:Icon(Icons.translate),title:Text('OCR language: Hindi (Devanagari)')),
+      const SwitchListTile(value:true,onChanged:null,title:Text('Extract voter photos from PDFs')),
+      const SwitchListTile(value:true,onChanged:null,title:Text('Detect explicit DELETED marks only')),
+      const SwitchListTile(value:true,onChanged:null,title:Text('Flag uncertain OCR fields for review')),
     ]))),
     const SizedBox(height:14),
-    FilledButton.icon(onPressed:pdfName == null ? null : () => ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content:Text('PDF चुनी गई है। वास्तविक OCR और Google Sheets API जोड़ना बाकी है।'))),
-      icon:const Icon(Icons.document_scanner),label:const Text('OCR और समीक्षा शुरू करें')),
+    if (selectedPdfs.isNotEmpty) ...[
+      const SizedBox(height: 8),
+      ...selectedPdfs.map((file) => Card(child: ListTile(
+        leading: const Icon(Icons.picture_as_pdf_rounded),
+        title: Text(file.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+        subtitle: Text(file.size > 0 ? '${(file.size / 1024 / 1024).toStringAsFixed(2)} MB' : 'PDF selected'),
+        trailing: IconButton(tooltip: 'Remove file', onPressed: () => removePdf(file), icon: const Icon(Icons.close)),
+      ))),
+    ],
+    const SizedBox(height: 14),
+    FilledButton.icon(
+      onPressed: selectedPdfs.isEmpty ? null : () => ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PDFs selected. OCR, duplicate checks, image sync, and record updates need the import backend, which is not connected yet.'))),
+      icon: const Icon(Icons.document_scanner), label: const Text('Start OCR and review')),
     const SizedBox(height:10),
     const Card(child:Padding(padding:EdgeInsets.all(14),child:Text(
-      'यह starter UI PDF चुन सकता है, लेकिन OCR, फोटो extraction, Google Sheets sync और सुरक्षित import preview के लिए backend/API integration आवश्यक है.'))),
+      'Multiple PDF selection is available. OCR, duplicate detection across PDFs, record merging, photo extraction, and persistent sync still require backend integration. Existing photos must be preserved when a new PDF has no photo, and missing photos filled when available.'))),
   ]);
 }
