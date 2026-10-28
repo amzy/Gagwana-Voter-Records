@@ -149,12 +149,12 @@ class _HomePageState extends State<HomePage> {
         suffixIcon: search.text.isEmpty ? null : IconButton(onPressed: () { search.clear(); setState(() {}); }, icon: const Icon(Icons.close)))),
     const SizedBox(height: 10),
     Row(children: [
-      Expanded(child: DropdownButtonFormField<String>(value: ward, decoration: const InputDecoration(labelText: 'वार्ड'),
+      Expanded(child: DropdownButtonFormField<String>(initialValue: ward, decoration: const InputDecoration(labelText: 'वार्ड'),
         items: ['सभी वार्ड', ...List.generate(13,(i)=>(i+1).toString().padLeft(2,'0'))]
           .map((s)=>DropdownMenuItem(value:s,child:Text(s=='सभी वार्ड'?s:'वार्ड $s'))).toList(),
         onChanged:(v)=>setState(()=>ward=v??'सभी वार्ड'))),
       const SizedBox(width: 10),
-      Expanded(child: DropdownButtonFormField<String>(value: status, decoration: const InputDecoration(labelText: 'स्थिति'),
+      Expanded(child: DropdownButtonFormField<String>(initialValue: status, decoration: const InputDecoration(labelText: 'स्थिति'),
         items: ['सभी रिकॉर्ड','केवल सक्रिय','केवल Flagged','केवल Deleted']
           .map((s)=>DropdownMenuItem(value:s,child:Text(s))).toList(),
         onChanged:(v)=>setState(()=>status=v??'सभी रिकॉर्ड'))),
