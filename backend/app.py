@@ -18,9 +18,10 @@ from typing import Any
 
 import pdfplumber
 import pytesseract
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from secrets import compare_digest
 from pydantic import BaseModel, Field
 
 DB_PATH = Path(os.environ.get("VOTER_DB_PATH", "./data/voter_records.db"))
@@ -29,6 +30,15 @@ MAX_PAGES = int(os.environ.get("MAX_PDF_PAGES", "300"))
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Gagwana Voter Records API", version="1.0.0")
+bearer = HTTPBearer(auto_error=False)
+
+
+def require_api_token(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)) -> None:
+    expected = os.environ.get("VOTER_API_TOKEN", "").strip()
+    if not expected:
+        raise HTTPException(503, "Server admin must configure VOTER_API_TOKEN before using the API.")
+    if credentials is None or credentials.scheme.lower() != "bearer" or not compare_digest(credentials.credentials, expected):
+        raise HTTPException(401, "Valid bearer token required.")
 # Set VOTER_ALLOWED_ORIGINS to a comma-separated allowlist in deployment.
 origins = [x.strip() for x in os.environ.get("VOTER_ALLOWED_ORIGINS", "").split(",") if x.strip()]
 if origins:
@@ -169,7 +179,7 @@ def health():
 
 
 @app.get("/records")
-def list_records(q: str = "", ward: str = "", limit: int = 100, offset: int = 0):
+def list_records(q: str = "", ward: str = "", limit: int = 100, offset: int = 0, _auth: None = Depends(require_api_token)):
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     clauses, params = [], []
@@ -191,7 +201,7 @@ def list_records(q: str = "", ward: str = "", limit: int = 100, offset: int = 0)
 
 
 @app.post("/imports/pdf")
-async def scan_pdf(file: UploadFile = File(...)):
+async def scan_pdf(file: UploadFile = File(...), _auth: None = Depends(require_api_token)):
     """Extract text per page; OCR scanned pages in Hindi+English and stage for review."""
     filename = Path(file.filename or "upload.pdf").name
     if not filename.lower().endswith(".pdf"):
@@ -249,7 +259,7 @@ async def scan_pdf(file: UploadFile = File(...)):
 
 
 @app.get("/imports/{batch_id}/pages")
-def get_import_pages(batch_id: str):
+def get_import_pages(batch_id: str, _auth: None = Depends(require_api_token)):
     with connection() as db:
         batch = db.execute("SELECT * FROM import_batches WHERE batch_id=?", (batch_id,)).fetchone()
         if not batch:
@@ -262,7 +272,7 @@ def get_import_pages(batch_id: str):
 
 
 @app.post("/imports/preview")
-def preview_import(request: PreviewRequest):
+def preview_import(request: PreviewRequest, _auth: None = Depends(require_api_token)):
     """Compute merge counts without writing voter records."""
     incoming: dict[str, ImportRecord] = {}
     duplicates = 0
@@ -303,7 +313,7 @@ def preview_import(request: PreviewRequest):
 
 
 @app.post("/imports/commit")
-def commit_import(request: CommitRequest):
+def commit_import(request: CommitRequest, _auth: None = Depends(require_api_token)):
     if not request.confirm:
         raise HTTPException(400, "Set confirm=true after reviewing the preview.")
     incoming: dict[str, ImportRecord] = {}
@@ -379,7 +389,7 @@ def commit_import(request: CommitRequest):
 
 
 @app.get("/imports")
-def list_imports(limit: int = 100):
+def list_imports(limit: int = 100, _auth: None = Depends(require_api_token)):
     with connection() as db:
         rows = db.execute("SELECT batch_id,filename,sha256,page_count,status,created_at FROM import_batches ORDER BY created_at DESC LIMIT ?",
                           (max(1, min(limit, 500)),)).fetchall()
