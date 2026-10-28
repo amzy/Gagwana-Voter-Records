@@ -98,8 +98,10 @@ class _HomePageState extends State<HomePage> {
     );
     if (result == null || result.files.isEmpty) return;
     setState(() {
-      final existingNames = selectedPdfs.map((file) => file.name).toSet();
-      selectedPdfs.addAll(result.files.where((file) => !existingNames.contains(file.name)));
+      final knownNames = selectedPdfs.map((file) => file.name).toSet();
+      for (final file in result.files) {
+        if (knownNames.add(file.name)) selectedPdfs.add(file);
+      }
       tab = 1;
     });
   }
