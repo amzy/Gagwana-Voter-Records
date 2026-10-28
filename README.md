@@ -45,6 +45,17 @@ uvicorn app:app --reload --port 8080
 
 The API requires `Authorization: Bearer <VOTER_API_TOKEN>` for voter data and import endpoints. `GET /health` is public and contains no voter data. Set `VOTER_ALLOWED_ORIGINS` to the exact deployed Flutter origin(s) when browser access is needed. Never ship the API token inside a public Flutter web build. Use an authenticated proxy/backend for browser sessions and mount `/data` on persistent server storage. Back up the SQLite file regularly.
 
+### Docker deployment with persistent storage
+
+From `backend/`, configure `VOTER_API_TOKEN` in your shell or deployment secret manager, then run:
+
+```bash
+export VOTER_API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
+docker compose up --build -d
+```
+
+Docker Compose keeps the database in the named `voter_data` volume and binds port 8080 to localhost only. Put a TLS-enabled authenticated reverse proxy in front of it for remote use. Back up the named volume; a container image or redeploy is not a backup.
+
 ### API endpoints
 
 - `POST /imports/pdf` — upload a PDF, extract embedded page text, and use Tesseract Hindi+English OCR when the page appears scanned. Stores page-level extraction in SQLite and returns a batch ID.
