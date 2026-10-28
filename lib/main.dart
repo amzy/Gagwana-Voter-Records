@@ -124,7 +124,63 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> uploadSelectedPdfs() async {
-    final baseUrl = apiUrl.text.trim().replaceFirst(RegExp(r'/+
+    final baseUrl = apiUrl.text.trim().replaceFirst(RegExp(r'/+$'), '');
+    final token = apiToken.text.trim();
+    if (baseUrl.isEmpty || token.isEmpty) {
+      setState(() => importStatus = 'Enter the backend URL and API token before uploading.');
+      return;
+    }
+    setState(() {
+      uploading = true;
+      importStatus = 'Connecting to backend and scanning selected PDFs…';
+      scannedBatches.clear();
+    });
+    var succeeded = 0;
+    final errors = <String>[];
+    for (final file in List<PlatformFile>.from(selectedPdfs)) {
+      try {
+        final bytes = file.bytes;
+        if (bytes == null || bytes.isEmpty) {
+          errors.add('\${file.name}: file bytes are unavailable. Re-select the PDF and try again.');
+          continue;
+        }
+        final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/imports/pdf'));
+        request.headers['Authorization'] = 'Bearer $token';
+        request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: file.name));
+        final streamed = await request.send().timeout(const Duration(minutes: 5));
+        final response = await http.Response.fromStream(streamed);
+        Map<String, dynamic> payload = {};
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) payload = decoded;
+        } catch (_) {}
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          if (payload['duplicate_upload'] == true) {
+            errors.add('\${file.name}: this exact PDF was already scanned (batch \${payload['existing_batch_id']}).');
+          } else {
+            scannedBatches.add(payload);
+            succeeded++;
+          }
+        } else {
+          final detail = payload['detail']?.toString() ?? response.reasonPhrase ?? 'HTTP \${response.statusCode}';
+          errors.add('\${file.name}: $detail');
+        }
+        if (mounted) setState(() {});
+      } catch (error) {
+        errors.add('\${file.name}: cannot reach backend. Confirm it is running, the URL is correct, and CORS allows this localhost origin. Details: \${error.runtimeType}.');
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      uploading = false;
+      importStatus = [
+        'Scanned successfully: $succeeded of \${selectedPdfs.length} PDF(s).',
+        if (errors.isNotEmpty) errors.join('\n'),
+        if (succeeded > 0) 'Page text is staged for review. This does not yet save parsed voter records.',
+      ].join('\n\n');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 850;
