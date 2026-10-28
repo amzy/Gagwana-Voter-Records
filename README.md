@@ -25,7 +25,38 @@ In GitHub, open **Settings → Pages** and set **Build and deployment → Source
 
 https://amzy.github.io/Gagwana-Voter-Records/
 
-## Important implementation status
-This is a UI starter with demonstration voter records. The PDF picker selects a file, but actual Hindi OCR, voter-photo extraction, Google Sheets synchronization, import preview, and persistence are not implemented yet.
+## SQL backend (SQLite)
 
-For production, process PDFs on a secured backend (Firebase Cloud Functions or Cloud Run), use Hindi Devanagari OCR and confidence-based review, extract images with source-page references, detect only explicit DELETED marks, and show a preview before updating records. Keep Google service-account credentials on the server, protect import/review with admin authentication, and maintain an audit log. Do not infer that a voter is deleted merely because they are absent from a later PDF.
+A small FastAPI backend is available in `backend/`. It uses one persistent SQLite file (`voter_records.db`), which is appropriate for a few thousand records and does not require a separate database server. Do not put the database file in the Flutter web build or a temporary container filesystem.
+
+### Run locally
+
+Install Python 3.12+, Tesseract with Hindi language data, and Poppler (used by PDF rendering). Then:
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export VOTER_DB_PATH="$PWD/data/voter_records.db"
+export VOTER_API_TOKEN="replace-with-a-long-random-secret"
+uvicorn app:app --reload --port 8080
+```
+
+The API requires `Authorization: Bearer <VOTER_API_TOKEN>` for voter data and import endpoints. `GET /health` is public and contains no voter data. Set `VOTER_ALLOWED_ORIGINS` to the exact deployed Flutter origin(s) when browser access is needed. Never ship the API token inside a public Flutter web build. Use an authenticated proxy/backend for browser sessions and mount `/data` on persistent server storage. Back up the SQLite file regularly.
+
+### API endpoints
+
+- `POST /imports/pdf` — upload a PDF, extract embedded page text, and use Tesseract Hindi+English OCR when the page appears scanned. Stores page-level extraction in SQLite and returns a batch ID.
+- `GET /imports/{batch_id}/pages` — retrieve staged page text for review.
+- `POST /imports/preview` — preview record merge counts without changing voter records.
+- `POST /imports/commit` — commit reviewed, structured records transactionally after `confirm: true`.
+- `GET /records` — search/paginate saved records.
+- `GET /imports` — import history.
+
+Commit requests require a batch ID created by scanning a PDF. Voter IDs are normalized for deduplication. Empty fields do not overwrite existing data; missing incoming photos never erase saved photos; explicit deletion evidence is required to set a record as deleted; uncertain/low-confidence records can be flagged for review. Import actions are written to an audit table.
+
+### Current limitations (important)
+
+The Flutter interface is not yet connected to these endpoints. PDF scanning currently stages per-page extracted/OCR text; it does **not** automatically parse each page into reliable structured voter rows, extract and align voter photos, or visually verify DELETED stamps. Those tasks require a layout-aware parser and a review UI before the resulting records should be committed. The API intentionally expects structured records at preview/commit, rather than silently treating raw OCR text as verified data. The existing Flutter voter list is still demonstration data until the app is wired to the backend.
+
