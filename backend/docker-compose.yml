@@ -1,0 +1,17 @@
+services:
+  voter-api:
+    build: .
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      VOTER_DB_PATH: /data/voter_records.db
+      VOTER_API_TOKEN: ${VOTER_API_TOKEN:?Set VOTER_API_TOKEN in your environment}
+      VOTER_ALLOWED_ORIGINS: ${VOTER_ALLOWED_ORIGINS:-}
+      MAX_PDF_BYTES: ${MAX_PDF_BYTES:-31457280}
+      MAX_PDF_PAGES: ${MAX_PDF_PAGES:-300}
+    volumes:
+      - voter_data:/data
+    restart: unless-stopped
+
+volumes:
+  voter_data:
