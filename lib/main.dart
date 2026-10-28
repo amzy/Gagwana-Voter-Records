@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 void main() => runApp(const GagwanaApp());
 
@@ -72,6 +75,11 @@ class _HomePageState extends State<HomePage> {
   int tab = 0;
   String ward = 'All wards', status = 'All records';
   final List<PlatformFile> selectedPdfs = [];
+  final apiUrl = TextEditingController(text: 'http://127.0.0.1:8080');
+  final apiToken = TextEditingController();
+  bool uploading = false;
+  String importStatus = '';
+  final List<Map<String, dynamic>> scannedBatches = [];
 
   List<Voter> get filtered => records.where((v) {
     final q = search.text.trim().toLowerCase();
@@ -87,14 +95,19 @@ class _HomePageState extends State<HomePage> {
   }).toList();
 
   @override
-  void dispose() { search.dispose(); super.dispose(); }
+  void dispose() {
+    search.dispose();
+    apiUrl.dispose();
+    apiToken.dispose();
+    super.dispose();
+  }
 
   Future<void> pickPdf() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
       allowMultiple: true,
-      withData: false,
+      withData: true,
     );
     if (result == null || result.files.isEmpty) return;
     setState(() {
@@ -108,6 +121,293 @@ class _HomePageState extends State<HomePage> {
 
   void removePdf(PlatformFile file) {
     setState(() => selectedPdfs.removeWhere((item) => item.name == file.name));
+  }
+
+  Future<void> uploadSelectedPdfs() async {
+    final baseUrl = apiUrl.text.trim().replaceFirst(RegExp(r'/+
+  @override
+  Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= 850;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Row(children: [
+          CircleAvatar(backgroundColor: Color(0xFFFF626B), child: Icon(Icons.groups_rounded, color: Colors.white)),
+          SizedBox(width: 10),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Gagwana', style: TextStyle(fontWeight: FontWeight.w800)),
+            Text('Voter Records', style: TextStyle(fontSize: 12)),
+          ]),
+        ]),
+        actions: [IconButton(
+          tooltip: dark ? 'Light mode' : 'Dark mode',
+          onPressed: () => widget.onTheme(!dark),
+          icon: Icon(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded)),
+          const SizedBox(width: 8)],
+      ),
+      body: Row(children: [
+        if (wide) NavigationRail(
+          selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v),
+          labelType: NavigationRailLabelType.all,
+          destinations: const [
+            NavigationRailDestination(icon: Icon(Icons.search), label: Text('Search')),
+            NavigationRailDestination(icon: Icon(Icons.picture_as_pdf), label: Text('Import PDFs')),
+          ]),
+        Expanded(child: Center(child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1100),
+          child: tab == 0 ? searchScreen() : importScreen()))),
+      ]),
+      bottomNavigationBar: wide ? null : NavigationBar(
+        selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
+          NavigationDestination(icon: Icon(Icons.picture_as_pdf), label: 'Import PDFs'),
+        ]),
+      floatingActionButton: tab == 0 ? FloatingActionButton.extended(
+        onPressed: pickPdf, icon: const Icon(Icons.upload_file), label: const Text('Upload PDFs')) : null,
+    );
+  }
+
+  Widget searchScreen() => ListView(padding: const EdgeInsets.fromLTRB(16,12,16,90), children: [
+    Text('Search voter records', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+    const SizedBox(height: 6),
+    const Text('Search by voter name, relative name, voter ID, or serial number. Voter data remains in Hindi.'),
+    const SizedBox(height: 16),
+    TextField(controller: search, onChanged: (_) => setState(() {}),
+      decoration: InputDecoration(hintText: 'Search name, relative, voter ID, or serial…', prefixIcon: const Icon(Icons.search),
+        suffixIcon: search.text.isEmpty ? null : IconButton(onPressed: () { search.clear(); setState(() {}); }, icon: const Icon(Icons.close)))),
+    const SizedBox(height: 10),
+    Row(children: [
+      Expanded(child: DropdownButtonFormField<String>(initialValue: ward, decoration: const InputDecoration(labelText: 'Ward'),
+        items: ['All wards', ...List.generate(13,(i)=>(i+1).toString().padLeft(2,'0'))]
+          .map((s)=>DropdownMenuItem(value:s,child:Text(s=='All wards'?s:'Ward $s'))).toList(),
+        onChanged:(v)=>setState(()=>ward=v??'All wards'))),
+      const SizedBox(width: 10),
+      Expanded(child: DropdownButtonFormField<String>(initialValue: status, decoration: const InputDecoration(labelText: 'Record status'),
+        items: ['All records','Active only','Flagged only','Deleted only']
+          .map((s)=>DropdownMenuItem(value:s,child:Text(s))).toList(),
+        onChanged:(v)=>setState(()=>status=v??'All records'))),
+    ]),
+    const SizedBox(height: 16),
+    Row(children: [Text('Results', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+      const Spacer(), Text('${filtered.length} records')]),
+    const SizedBox(height: 8),
+    if (filtered.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No records found')))),
+    ...filtered.map(recordCard),
+  ]);
+
+  Widget recordCard(Voter v) => Card(margin: const EdgeInsets.only(bottom:10), child: InkWell(
+    borderRadius: BorderRadius.circular(20),
+    onTap: () => showModalBottomSheet<void>(context: context, isScrollControlled: true, showDragHandle: true,
+      builder: (_) => detailSheet(v)),
+    child: Padding(padding: const EdgeInsets.all(14), child: Row(children: [
+      CircleAvatar(radius: 25, backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        child: Icon(Icons.person, size: 30, color: Theme.of(context).colorScheme.onPrimaryContainer)),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [Expanded(child: Text(v.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize:16))),
+          badge(v.status)]),
+        const SizedBox(height: 4), Text('Relative: ${v.relative}'),
+        const SizedBox(height: 5), Text('ID: ${v.id}', style: Theme.of(context).textTheme.bodySmall),
+        Text('Ward ${v.ward} • Serial ${v.serial} • Age ${v.age}',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      ])),
+      const Icon(Icons.chevron_right),
+    ])),
+  ));
+
+  Widget badge(Status s) {
+    final c = s == Status.active ? const Color(0xFF16A765) : s == Status.flagged ? const Color(0xFFF59E0B) : const Color(0xFFEF4444);
+    final label = s == Status.active ? 'Active' : s == Status.flagged ? 'Flagged' : 'Deleted';
+    return Container(padding: const EdgeInsets.symmetric(horizontal:9,vertical:5),
+      decoration: BoxDecoration(color:c.withValues(alpha:.14),borderRadius:BorderRadius.circular(30)),
+      child: Text(label, style: TextStyle(color:c,fontWeight:FontWeight.w700,fontSize:11)));
+  }
+
+  Widget detailSheet(Voter v) => SafeArea(child: Padding(
+    padding: EdgeInsets.fromLTRB(20,8,20,MediaQuery.viewInsetsOf(context).bottom+24),
+    child: SingleChildScrollView(child: Column(crossAxisAlignment:CrossAxisAlignment.start,children: [
+      Text('Voter details', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+      const SizedBox(height:16),
+      const Center(child: CircleAvatar(radius:42, child: Icon(Icons.person,size:48))),
+      const SizedBox(height:10),
+      Center(child: Text(v.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold))),
+      const SizedBox(height:14),
+      detailRow('Voter ID',v.id), detailRow('Serial number','${v.serial}'), detailRow('Ward',v.ward),
+      detailRow('Name',v.name), detailRow('Relative name',v.relative), detailRow('Age','${v.age}'),
+      detailRow('Status',v.status == Status.active ? 'Active' : v.status == Status.flagged ? 'Flagged — review required' : 'Deleted — explicit PDF mark'),
+      detailRow('Source','${v.pdf}, page ${v.page}'),
+    ])),
+  ));
+
+  Widget detailRow(String label,String value) => Padding(padding: const EdgeInsets.symmetric(vertical:8),
+    child: Row(children: [SizedBox(width:135, child: Text(label, style: TextStyle(color:Theme.of(context).colorScheme.onSurfaceVariant))),
+      Expanded(child: Text(value, style: const TextStyle(fontWeight:FontWeight.w600)))]));
+
+  Widget importScreen() => ListView(padding: const EdgeInsets.all(16), children: [
+    Text('Import voter-list PDFs', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight:FontWeight.w800)),
+    const SizedBox(height:8),
+    const Text('Select multiple PDFs. Review OCR results, resolve duplicates, and confirm changes before updating the master records.'),
+    const SizedBox(height:18),
+    Card(child: InkWell(onTap:pickPdf, borderRadius:BorderRadius.circular(20), child: Padding(
+      padding: const EdgeInsets.all(28), child: Column(children: [
+        Icon(Icons.cloud_upload_rounded,size:52,color:Theme.of(context).colorScheme.primary),
+        const SizedBox(height:12),
+        Text(selectedPdfs.isEmpty ? 'Select voter-list PDFs' : '${selectedPdfs.length} PDF file(s) selected',style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold)),
+        const SizedBox(height:6), const Text('Tap to select one or multiple PDF files'),
+      ])))),
+    const SizedBox(height:16),
+    Card(child: Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Text('Import settings',style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.bold)),
+      const ListTile(leading:Icon(Icons.translate),title:Text('OCR language: Hindi (Devanagari)')),
+      const SwitchListTile(value:true,onChanged:null,title:Text('Extract voter photos from PDFs')),
+      const SwitchListTile(value:true,onChanged:null,title:Text('Detect explicit DELETED marks only')),
+      const SwitchListTile(value:true,onChanged:null,title:Text('Flag uncertain OCR fields for review')),
+    ]))),
+    const SizedBox(height:14),
+    if (selectedPdfs.isNotEmpty) ...[
+      const SizedBox(height: 8),
+      ...selectedPdfs.map((file) => Card(child: ListTile(
+        leading: const Icon(Icons.picture_as_pdf_rounded),
+        title: Text(file.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+        subtitle: Text(file.size > 0 ? '${(file.size / 1024 / 1024).toStringAsFixed(2)} MB' : 'PDF selected'),
+        trailing: IconButton(tooltip: 'Remove file', onPressed: () => removePdf(file), icon: const Icon(Icons.close)),
+      ))),
+    ],
+    const SizedBox(height: 14),
+    Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Local import backend', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('Start the Python backend separately before uploading. For localhost debugging, use http://127.0.0.1:8080. Enter the VOTER_API_TOKEN configured on the backend.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: apiUrl,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(labelText: 'Backend URL', hintText: 'http://127.0.0.1:8080'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: apiToken,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Backend API token', hintText: 'VOTER_API_TOKEN'),
+            ),
+          ],
+        ),
+      ),
+    ),
+    const SizedBox(height: 14),
+    FilledButton.icon(
+      onPressed: selectedPdfs.isEmpty || uploading ? null : uploadSelectedPdfs,
+      icon: uploading
+          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.document_scanner),
+      label: Text(uploading ? 'Uploading and scanning…' : 'Upload PDFs and scan'),
+    ),
+    if (importStatus.isNotEmpty) ...[
+      const SizedBox(height: 12),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Text(importStatus),
+        ),
+      ),
+    ],
+    if (scannedBatches.isNotEmpty) ...[
+      const SizedBox(height: 12),
+      Text('Scanned PDF results', style: Theme.of(context).textTheme.titleLarge),
+      const SizedBox(height: 8),
+      ...scannedBatches.map((batch) => Card(
+        child: ExpansionTile(
+          leading: const Icon(Icons.fact_check_outlined),
+          title: Text(batch['filename']?.toString() ?? 'PDF'),
+          subtitle: Text('${batch['page_count'] ?? 0} pages • ${batch['status'] ?? 'Scanned'}'),
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: SelectableText(
+                (batch['pages'] as List? ?? const [])
+                    .map((page) => 'Page ${page['page']}: ${page['text']}')
+                    .join('\\n\\n'),
+              ),
+            ),
+          ],
+        ),
+      )),
+    ],
+    const SizedBox(height: 10),
+    const Text('Scanning stages page text for review. Voter rows, photos, and deletion marks still require structured parsing and review before records are saved.'),
+
+  ]);
+}
+), '');
+    final token = apiToken.text.trim();
+    if (baseUrl.isEmpty || token.isEmpty) {
+      setState(() => importStatus = 'Enter the backend URL and API token before uploading.');
+      return;
+    }
+    setState(() {
+      uploading = true;
+      importStatus = 'Connecting to backend and scanning selected PDFs…';
+      scannedBatches.clear();
+    });
+    var succeeded = 0;
+    final errors = <String>[];
+    for (final file in List<PlatformFile>.from(selectedPdfs)) {
+      try {
+        final bytes = file.bytes;
+        if (bytes == null || bytes.isEmpty) {
+          errors.add('${file.name}: file bytes are unavailable. Re-select the PDF and try again.');
+          continue;
+        }
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl/imports/pdf'),
+        );
+        request.headers['Authorization'] = 'Bearer $token';
+        request.files.add(http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: file.name,
+        ));
+        final streamed = await request.send().timeout(const Duration(minutes: 5));
+        final response = await http.Response.fromStream(streamed);
+        Map<String, dynamic> payload = {};
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) payload = decoded;
+        } catch (_) {
+          // Show a safe status-based message for non-JSON responses.
+        }
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          if (payload['duplicate_upload'] == true) {
+            errors.add('${file.name}: this exact PDF was already scanned (batch ${payload['existing_batch_id']}).');
+          } else {
+            scannedBatches.add(payload);
+            succeeded++;
+          }
+        } else {
+          final detail = payload['detail']?.toString() ?? response.reasonPhrase ?? 'HTTP ${response.statusCode}';
+          errors.add('${file.name}: $detail');
+        }
+        if (mounted) setState(() {});
+      } catch (error) {
+        errors.add('${file.name}: cannot reach backend. Confirm it is running, the URL is correct, and CORS allows this localhost origin. Details: ${error.runtimeType}.');
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      uploading = false;
+      importStatus = [
+        'Scanned successfully: $succeeded of ${selectedPdfs.length} PDF(s).',
+        if (errors.isNotEmpty) errors.join('\\n'),
+        if (succeeded > 0) 'Page text is staged for review. This does not yet save parsed voter records.',
+      ].join('\\n\\n');
+    });
   }
 
   @override
@@ -260,12 +560,72 @@ class _HomePageState extends State<HomePage> {
       ))),
     ],
     const SizedBox(height: 14),
+    Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Local import backend', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('Start the Python backend separately before uploading. For localhost debugging, use http://127.0.0.1:8080. Enter the VOTER_API_TOKEN configured on the backend.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: apiUrl,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(labelText: 'Backend URL', hintText: 'http://127.0.0.1:8080'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: apiToken,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Backend API token', hintText: 'VOTER_API_TOKEN'),
+            ),
+          ],
+        ),
+      ),
+    ),
+    const SizedBox(height: 14),
     FilledButton.icon(
-      onPressed: selectedPdfs.isEmpty ? null : () => ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PDFs selected. OCR, duplicate checks, image sync, and record updates need the import backend, which is not connected yet.'))),
-      icon: const Icon(Icons.document_scanner), label: const Text('Start OCR and review')),
-    const SizedBox(height:10),
-    const Card(child:Padding(padding:EdgeInsets.all(14),child:Text(
-      'Multiple PDF selection is available. OCR, duplicate detection across PDFs, record merging, photo extraction, and persistent sync still require backend integration. Existing photos must be preserved when a new PDF has no photo, and missing photos filled when available.'))),
+      onPressed: selectedPdfs.isEmpty || uploading ? null : uploadSelectedPdfs,
+      icon: uploading
+          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.document_scanner),
+      label: Text(uploading ? 'Uploading and scanning…' : 'Upload PDFs and scan'),
+    ),
+    if (importStatus.isNotEmpty) ...[
+      const SizedBox(height: 12),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Text(importStatus),
+        ),
+      ),
+    ],
+    if (scannedBatches.isNotEmpty) ...[
+      const SizedBox(height: 12),
+      Text('Scanned PDF results', style: Theme.of(context).textTheme.titleLarge),
+      const SizedBox(height: 8),
+      ...scannedBatches.map((batch) => Card(
+        child: ExpansionTile(
+          leading: const Icon(Icons.fact_check_outlined),
+          title: Text(batch['filename']?.toString() ?? 'PDF'),
+          subtitle: Text('${batch['page_count'] ?? 0} pages • ${batch['status'] ?? 'Scanned'}'),
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: SelectableText(
+                (batch['pages'] as List? ?? const [])
+                    .map((page) => 'Page ${page['page']}: ${page['text']}')
+                    .join('\\n\\n'),
+              ),
+            ),
+          ],
+        ),
+      )),
+    ],
+    const SizedBox(height: 10),
+    const Text('Scanning stages page text for review. Voter rows, photos, and deletion marks still require structured parsing and review before records are saved.'),
+
   ]);
 }
