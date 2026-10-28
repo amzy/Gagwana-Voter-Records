@@ -148,7 +148,7 @@ class ImportRecord(BaseModel):
     gender: str = ""
     photo_path: Optional[str] = None
     source_pdf: str = ""
-    source_page: int | None = None
+    source_page: Optional[int] = None
     raw_text: str = ""
     confidence: Optional[float] = Field(default=None, ge=0, le=1)
     deleted_mark_detected: bool = False
