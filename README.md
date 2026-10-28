@@ -15,7 +15,7 @@ Install Flutter stable, then run:
 
 ```bash
 flutter pub get
-flutter run -d chrome
+flutter run -d chrome --web-port=7357
 ```
 
 ## GitHub Pages
@@ -40,6 +40,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 export VOTER_DB_PATH="$PWD/data/voter_records.db"
 export VOTER_API_TOKEN="replace-with-a-long-random-secret"
+# Match the exact Flutter debug origin used below.
+export VOTER_ALLOWED_ORIGINS="http://localhost:7357,http://127.0.0.1:7357"
 uvicorn app:app --reload --port 8080
 ```
 
@@ -55,6 +57,15 @@ docker compose up --build -d
 ```
 
 Docker Compose keeps the database in the named `voter_data` volume and binds port 8080 to localhost only. Put a TLS-enabled authenticated reverse proxy in front of it for remote use. Back up the named volume; a container image or redeploy is not a backup.
+
+### Connect the Flutter debug app
+
+1. Start the backend in one terminal using the commands above.
+2. In another terminal, run Flutter on the matching fixed port: `flutter run -d chrome --web-port=7357`.
+3. Open **Import PDFs**. Enter `http://127.0.0.1:8080` as Backend URL and the same `VOTER_API_TOKEN` value in the API token field.
+4. Select PDFs and click **Upload PDFs and scan**. The app shows per-file errors, duplicate-upload messages, and extracted page text.
+
+If Flutter is running on a different port, update `VOTER_ALLOWED_ORIGINS` to match that exact origin and restart the backend. The token field is entered at runtime; do not hard-code the token into Flutter source or ship a shared admin token in a public web app.
 
 ### API endpoints
 
