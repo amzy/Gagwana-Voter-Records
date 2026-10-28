@@ -141,7 +141,7 @@ class _HomePageState extends State<HomePage> {
       try {
         final bytes = file.bytes;
         if (bytes == null || bytes.isEmpty) {
-          errors.add('\${file.name}: file bytes are unavailable. Re-select the PDF and try again.');
+          errors.add('${file.name}: file bytes are unavailable. Re-select the PDF and try again.');
           continue;
         }
         final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/imports/pdf'));
@@ -156,25 +156,25 @@ class _HomePageState extends State<HomePage> {
         } catch (_) {}
         if (response.statusCode >= 200 && response.statusCode < 300) {
           if (payload['duplicate_upload'] == true) {
-            errors.add('\${file.name}: this exact PDF was already scanned (batch \${payload['existing_batch_id']}).');
+            errors.add('${file.name}: this exact PDF was already scanned (batch ${payload['existing_batch_id']}).');
           } else {
             scannedBatches.add(payload);
             succeeded++;
           }
         } else {
-          final detail = payload['detail']?.toString() ?? response.reasonPhrase ?? 'HTTP \${response.statusCode}';
-          errors.add('\${file.name}: $detail');
+          final detail = payload['detail']?.toString() ?? response.reasonPhrase ?? 'HTTP ${response.statusCode}';
+          errors.add('${file.name}: $detail');
         }
         if (mounted) setState(() {});
       } catch (error) {
-        errors.add('\${file.name}: cannot reach backend. Confirm it is running, the URL is correct, and CORS allows this localhost origin. Details: \${error.runtimeType}.');
+        errors.add('${file.name}: cannot reach backend. Confirm it is running, the URL is correct, and CORS allows this localhost origin. Details: ${error.runtimeType}.');
       }
     }
     if (!mounted) return;
     setState(() {
       uploading = false;
       importStatus = [
-        'Scanned successfully: $succeeded of \${selectedPdfs.length} PDF(s).',
+        'Scanned successfully: $succeeded of ${selectedPdfs.length} PDF(s).',
         if (errors.isNotEmpty) errors.join('\n'),
         if (succeeded > 0) 'Page text is staged for review. This does not yet save parsed voter records.',
       ].join('\n\n');
