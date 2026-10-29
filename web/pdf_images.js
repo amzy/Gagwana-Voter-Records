@@ -153,11 +153,67 @@
     ctx.drawImage(source, x, y, width, height, 0, 0, canvas.width, canvas.height);
     return canvas;
   }
-  async function parseChunk(pageCanvas, pageNo, row, col, worker) {
-    const x0 = Math.round(pageCanvas.width * (0.035 + col * 0.31));
-    const x1 = Math.round(pageCanvas.width * (0.035 + (col + 1) * 0.31));
-    const y0 = Math.round(pageCanvas.height * (0.205 + row * 0.078));
-    const y1 = Math.round(pageCanvas.height * (0.205 + (row + 1) * 0.078));
+  function findRuleLines(canvas, axis, startRatio, endRatio, threshold) {
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const width = canvas.width, height = canvas.height;
+    const data = ctx.getImageData(0, 0, width, height).data;
+    const horizontal = axis === 'horizontal';
+    const length = horizontal ? width : height;
+    const cross = horizontal ? height : width;
+    const start = Math.floor(cross * startRatio);
+    const end = Math.floor(cross * endRatio);
+    const candidates = [];
+    for (let pos = start; pos < end; pos++) {
+      let dark = 0;
+      // Sample every 2 pixels for speed; grid rules span a large proportion of the page.
+      for (let i = 0; i < length; i += 2) {
+        const x = horizontal ? i : pos;
+        const y = horizontal ? pos : i;
+        const idx = (y * width + x) * 4;
+        const luminance = (data[idx] * 0.299) + (data[idx + 1] * 0.587) + (data[idx + 2] * 0.114);
+        if (luminance < 105) dark++;
+      }
+      if (dark / Math.ceil(length / 2) >= threshold) candidates.push(pos);
+    }
+    const groups = [];
+    for (const pos of candidates) {
+      const last = groups[groups.length - 1];
+      if (last && pos - last.end <= 3) {
+        last.end = pos;
+        last.sum += pos;
+        last.count++;
+      } else {
+        groups.push({ start: pos, end: pos, sum: pos, count: 1 });
+      }
+    }
+    return groups.map(g => Math.round(g.sum / g.count));
+  }
+  function detectVoterGrid(canvas) {
+    // Locate actual printed rules in the normalized scan, not fixed pixel positions.
+    const horizontal = findRuleLines(canvas, 'horizontal', 0.17, 0.97, 0.34);
+    const vertical = findRuleLines(canvas, 'vertical', 0.015, 0.985, 0.34);
+    const usableHorizontal = horizontal.filter(y => y / canvas.height >= 0.19);
+    const usableVertical = vertical.filter(x => x / canvas.width >= 0.02 && x / canvas.width <= 0.98);
+    if (usableVertical.length >= 4 && usableHorizontal.length >= 8) {
+      const cols = usableVertical.slice(0, 4);
+      const rows = usableHorizontal;
+      if (cols[3] - cols[0] > canvas.width * 0.65) {
+        const rowBounds = rows.filter((y, i) => i === 0 || y - rows[i - 1] > canvas.height * 0.025);
+        if (rowBounds.length >= 8) {
+          return { xBounds: cols, yBounds: rowBounds, detected: true };
+        }
+      }
+    }
+    // Fallback ratios for this known computer-generated template after aspect normalization.
+    return {
+      xBounds: [0.035, 0.345, 0.655, 0.965].map(x => Math.round(canvas.width * x)),
+      yBounds: Array.from({ length: 10 }, (_, i) => Math.round(canvas.height * (0.205 + i * 0.078))),
+      detected: false
+    };
+  }
+  async function parseChunk(pageCanvas, pageNo, row, col, worker, grid) {
+    const x0 = grid.xBounds[col], x1 = grid.xBounds[col + 1];
+    const y0 = grid.yBounds[row], y1 = grid.yBounds[row + 1];
     const crop = cropCanvas(pageCanvas, x0, y0, x1 - x0, y1 - y0);
     const result = await worker.recognize(crop);
     const text = (result.data.text || '').trim();
@@ -175,12 +231,11 @@
     return {
       page: pageNo, grid_row: row + 1, grid_column: col + 1,
       chunk_id: 'p' + pageNo + '-r' + (row + 1) + '-c' + (col + 1),
+      grid_detected: grid.detected,
       text, confidence: words.length ? Math.round(words.reduce((n, w) => n + w.confidence, 0) / words.length) : 0,
       valid_voter_candidate: valid, voter_id_candidate: voterIdMatch ? voterIdMatch[0] : null,
       deleted_stamp_candidate: deletedStamp,
       needs_review: !valid || deletedStamp || words.some(w => w.confidence < 55),
-      // This is the full voter-card crop (including its photo) for the separate
-      // image task; the crop is not yet a verified isolated portrait.
       chunk_image_data_url: valid ? crop.toDataURL('image/jpeg', 0.72) : null
     };
   }
@@ -226,10 +281,13 @@
           } else {
             const chunks = [];
             const jobs = [];
-            for (let row = 0; row < 9; row++) {
-              for (let col = 0; col < 3; col++) {
+            const grid = detectVoterGrid(pageCanvas);
+            const rowCount = Math.max(0, grid.yBounds.length - 1);
+            const colCount = Math.max(0, grid.xBounds.length - 1);
+            for (let row = 0; row < rowCount; row++) {
+              for (let col = 0; col < colCount; col++) {
                 const worker = workers[taskIndex++ % workers.length];
-                jobs.push(parseChunk(pageCanvas, pageNo, row, col, worker).then(chunk => {
+                jobs.push(parseChunk(pageCanvas, pageNo, row, col, worker, grid).then(chunk => {
                   chunks.push(chunk);
                 }).catch(error => {
                   chunks.push({ page: pageNo, grid_row: row + 1, grid_column: col + 1,
