@@ -458,26 +458,24 @@ class _HomePageState extends State<HomePage> {
               Text('Filter records', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 18),
               Text('Ward', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: draftWard,
-                isExpanded: true,
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.location_city_rounded), labelText: 'Select ward'),
-                items: ['All wards', ...List.generate(13, (i) => (i + 1).toString().padLeft(2, '0'))]
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v == 'All wards' ? v : 'Ward $v'))).toList(),
-                onChanged: (v) => setSheetState(() => draftWard = v ?? 'All wards'),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                'All wards', ...List.generate(13, (i) => (i + 1).toString().padLeft(2, '0'))
+              ].map((v) => ChoiceChip(
+                label: Text(v == 'All wards' ? v : 'Ward $v'),
+                selected: draftWard == v,
+                onSelected: (_) => setSheetState(() => draftWard = v),
+              )).toList()),
+              const SizedBox(height: 20),
               Text('Record status', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: draftStatus,
-                isExpanded: true,
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.filter_list_rounded), labelText: 'Select status'),
-                items: ['All records', 'Active only', 'Flagged only', 'Deleted only']
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                onChanged: (v) => setSheetState(() => draftStatus = v ?? 'All records'),
-              ),
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                'All records', 'Active only', 'Flagged only', 'Deleted only'
+              ].map((v) => ChoiceChip(
+                label: Text(v),
+                selected: draftStatus == v,
+                onSelected: (_) => setSheetState(() => draftStatus = v),
+              )).toList()),
               const SizedBox(height: 22),
               Row(children: [
                 Expanded(child: OutlinedButton(
