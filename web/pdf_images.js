@@ -43,12 +43,32 @@
     return canvas.toDataURL('image/jpeg', 0.88);
   }
   function getImage(page, id) {
+    // PDF.js can leave an image object unresolved when a page contains a
+    // damaged/unsupported image. Never let one image block the whole import.
     return new Promise(resolve => {
+      let settled = false;
+      const finish = value => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(value || null);
+      };
+      const timer = setTimeout(() => finish(null), 8000);
       try {
         const existing = page.objs.get(id);
-        resolve(imageObjectToDataUrl(existing));
+        if (existing) {
+          finish(imageObjectToDataUrl(existing));
+        } else {
+          page.objs.get(id, value => {
+            try { finish(imageObjectToDataUrl(value)); } catch (_) { finish(null); }
+          });
+        }
       } catch (_) {
-        page.objs.get(id, value => resolve(imageObjectToDataUrl(value)));
+        try {
+          page.objs.get(id, value => {
+            try { finish(imageObjectToDataUrl(value)); } catch (_) { finish(null); }
+          });
+        } catch (_) { finish(null); }
       }
     });
   }
@@ -61,6 +81,8 @@
     const pages = [];
     let totalImages = 0;
     for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+      // Yield to the browser between pages so large voter rolls stay responsive.
+      await new Promise(resolve => setTimeout(resolve, 0));
       const page = await pdf.getPage(pageNo);
       const textContent = await page.getTextContent();
       const text = textContent.items.map(item => item.str || '').join(' ').replace(/\s+/g, ' ').trim();
