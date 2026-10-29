@@ -16,6 +16,9 @@ external JSPromise<JSBoolean> _sqliteExportDb();
 @JS('gagwanaSqlite.importDb')
 external JSPromise<JSString> _sqliteImportDb(JSString base64);
 
+@JS('gagwanaPdfImages.extractImages')
+external JSPromise<JSString> _extractPdfImages(JSString base64, JSString filename);
+
 void main() => runApp(const GagwanaApp());
 
 class GagwanaApp extends StatefulWidget {
@@ -211,6 +214,41 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> scanSelectedPdfs() async {
+    if (selectedPdfs.isEmpty || uploading) return;
+    setState(() {
+      uploading = true;
+      scannedBatches.clear();
+      importStatus = 'Extracting embedded images and page text…';
+    });
+    try {
+      for (final file in selectedPdfs) {
+        final bytes = file.bytes;
+        if (bytes == null || bytes.isEmpty) {
+          throw Exception('Could not read ${file.name}. Please select it again.');
+        }
+        final raw = await _extractPdfImages(
+          base64Encode(bytes).toJS,
+          file.name.toJS,
+        ).toDart;
+        final batch = jsonDecode(raw.toDart) as Map<String, dynamic>;
+        if (!mounted) return;
+        setState(() => scannedBatches.add(batch));
+      }
+      if (!mounted) return;
+      final pages = scannedBatches.fold<int>(
+        0, (sum, batch) => sum + ((batch['page_count'] as num?)?.toInt() ?? 0));
+      final images = scannedBatches.fold<int>(
+        0, (sum, batch) => sum + ((batch['image_count'] as num?)?.toInt() ?? 0));
+      setState(() => importStatus =
+        'Extraction complete: $pages page(s), $images embedded image(s). Review the images below and match them to the correct voter before saving. Voter-field parsing and image-to-voter matching are not automatic in this step.');
+    } catch (error) {
+      if (mounted) setState(() => importStatus = 'PDF image extraction failed: $error');
+    } finally {
+      if (mounted) setState(() => uploading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 850;
@@ -391,11 +429,11 @@ class _HomePageState extends State<HomePage> {
     ),
     const SizedBox(height: 14),
     FilledButton.icon(
-      onPressed: selectedPdfs.isEmpty || uploading
-          ? null
-          : () => setState(() => importStatus = 'PDF upload is selected, but browser-only PDF text/OCR parsing and voter-row import are not implemented yet. The local SQLite database is available for storage and backup.'),
-      icon: const Icon(Icons.document_scanner),
-      label: Text(uploading ? 'Working…' : 'Scan selected PDFs'),
+      onPressed: selectedPdfs.isEmpty || uploading ? null : scanSelectedPdfs,
+      icon: uploading
+          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.document_scanner),
+      label: Text(uploading ? 'Extracting images…' : 'Extract PDF images'),
     ),
     const SizedBox(height: 10),
     if (importStatus.isNotEmpty) ...[
@@ -415,8 +453,45 @@ class _HomePageState extends State<HomePage> {
         child: ExpansionTile(
           leading: const Icon(Icons.fact_check_outlined),
           title: Text(batch['filename']?.toString() ?? 'PDF'),
-          subtitle: Text('${batch['page_count'] ?? 0} pages • ${batch['status'] ?? 'Scanned'}'),
+          subtitle: Text('${batch['page_count'] ?? 0} pages • ${batch['image_count'] ?? 0} embedded images'),
           children: [
+            ...(batch['pages'] as List? ?? const []).expand<Widget>((pageValue) {
+              final page = pageValue as Map<String, dynamic>;
+              final images = page['images'] as List? ?? const [];
+              return [
+                ListTile(
+                  dense: true,
+                  title: Text('Page ${page['page']}'),
+                  subtitle: Text((page['text'] ?? '').toString().isEmpty
+                      ? 'No selectable text on this page'
+                      : (page['text'] ?? '').toString(),
+                      maxLines: 3, overflow: TextOverflow.ellipsis),
+                ),
+                if (images.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Wrap(
+                      spacing: 10, runSpacing: 10,
+                      children: images.map<Widget>((imageValue) {
+                        final image = imageValue as Map<String, dynamic>;
+                        final dataUrl = (image['data_url'] ?? '').toString();
+                        final comma = dataUrl.indexOf(',');
+                        final bytes = comma >= 0
+                            ? base64Decode(dataUrl.substring(comma + 1))
+                            : <int>[];
+                        return SizedBox(
+                          width: 112, height: 132,
+                          child: Column(children: [
+                            Expanded(child: Image.memory(bytes, fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image))),
+                            Text('Image ${image['index']}', style: Theme.of(context).textTheme.bodySmall),
+                          ]),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+              ];
+            }),
             Padding(
               padding: const EdgeInsets.all(12),
               child: SelectableText(
