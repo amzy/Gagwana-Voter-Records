@@ -15,6 +15,61 @@
       document.head.appendChild(script);
     });
   }
+  const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+  let tesseractPromise = null;
+  let ocrWorkerPromise = null;
+  function loadTesseract() {
+    if (window.Tesseract) return Promise.resolve(window.Tesseract);
+    if (!tesseractPromise) tesseractPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = TESSERACT_URL;
+      script.onload = () => window.Tesseract
+        ? resolve(window.Tesseract)
+        : reject(new Error('Hindi OCR library did not initialise.'));
+      script.onerror = () => reject(new Error('Could not load Hindi OCR. Check internet and reload.'));
+      document.head.appendChild(script);
+    });
+    return tesseractPromise;
+  }
+  async function getOcrWorker() {
+    const Tesseract = await loadTesseract();
+    if (!ocrWorkerPromise) {
+      ocrWorkerPromise = Tesseract.createWorker('hin+eng', 1, {
+        langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+        logger: () => {},
+      });
+    }
+    return ocrWorkerPromise;
+  }
+  async function ocrPage(page) {
+    // OCR the rendered page image rather than trusting embedded PDF font mappings.
+    // Moderate scale keeps voter-roll scans readable without excessive memory use.
+    const viewport = page.getViewport({ scale: 1.35 });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const worker = await getOcrWorker();
+    const result = await worker.recognize(canvas);
+    const text = result.data.text || '';
+    const words = (result.data.words || []).map(word => ({
+      text: word.text || '',
+      confidence: Math.round(word.confidence || 0),
+      x0: word.bbox && word.bbox.x0 || 0,
+      y0: word.bbox && word.bbox.y0 || 0,
+      x1: word.bbox && word.bbox.x1 || 0,
+      y1: word.bbox && word.bbox.y1 || 0,
+    }));
+    // A page-level stamp is only a review signal; never mark every voter on
+    // that page as deleted. The record parser must confirm overlap per voter.
+    const deletedStampCandidates = words.filter(word =>
+      /^(deleted|delet?ed|delete|डिलीटेड)$/i.test(word.text.replace(/[^a-zA-Zअ-ह़-ॿ]/g, '')) &&
+      word.confidence >= 20);
+    return { text, words, deleted_stamp_candidates: deletedStampCandidates };
+  }
   function imageObjectToDataUrl(img) {
     if (!img || !img.width || !img.height || !img.data) return null;
     const canvas = document.createElement('canvas');
@@ -106,9 +161,9 @@
         if (dataUrl) images.push({ index: images.length + 1, data_url: dataUrl });
       }
       totalImages += images.length;
-      pages.push({ page: pageNo, text, images });
+      pages.push({ page: pageNo, text, embedded_text: embeddedText, ocr_text: ocr.text, ocr_words: ocr.words, deleted_stamp_candidates: ocr.deleted_stamp_candidates, ocr_error: ocr.error || null, images });
     }
-    return JSON.stringify({ filename, page_count: pdf.numPages, image_count: totalImages, pages });
+    if (ocrWorkerPromise) { try { await (await ocrWorkerPromise).terminate(); } catch (_) {} ocrWorkerPromise = null; }\n    return JSON.stringify({ filename, page_count: pdf.numPages, image_count: totalImages, pages });
   }
   window.gagwanaPdfImages = { extractImages };
 })();
