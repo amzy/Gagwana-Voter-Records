@@ -188,37 +188,66 @@
     }
     return groups.map(g => Math.round(g.sum / g.count));
   }
+  function findVerticalRulesInRegion(canvas, yStart, yEnd, threshold) {
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const width = canvas.width;
+    const data = ctx.getImageData(0, 0, width, canvas.height).data;
+    const startY = Math.max(0, Math.floor(yStart));
+    const endY = Math.min(canvas.height, Math.ceil(yEnd));
+    const candidates = [];
+    for (let x = Math.floor(width * 0.015); x < Math.ceil(width * 0.985); x++) {
+      let dark = 0;
+      let samples = 0;
+      for (let y = startY; y < endY; y += 2) {
+        const idx = (y * width + x) * 4;
+        const luminance = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+        if (luminance < 105) dark++;
+        samples++;
+      }
+      if (samples && dark / samples >= threshold) candidates.push(x);
+    }
+    const groups = [];
+    for (const x of candidates) {
+      const last = groups[groups.length - 1];
+      if (last && x - last.end <= 3) {
+        last.end = x; last.sum += x; last.count++;
+      } else {
+        groups.push({ start: x, end: x, sum: x, count: 1 });
+      }
+    }
+    return groups.map(g => Math.round(g.sum / g.count));
+  }
   function detectVoterGrid(canvas) {
-    // Locate actual printed rules in the normalized scan, not fixed pixel positions.\n    // Vertical rules must span at least half the page height; this excludes\n    // repeated photo edges that otherwise look like false column boundaries.
+    // Detect horizontal card rules first; use their extent to find vertical rules.
     const horizontal = findRuleLines(canvas, 'horizontal', 0.12, 0.97, 0.34);
-    const vertical = findRuleLines(canvas, 'vertical', 0.015, 0.985, 0.50);
-    const usableHorizontal = horizontal.filter(y => y / canvas.height >= 0.16);
-    const usableVertical = vertical.filter(x => x / canvas.width >= 0.02 && x / canvas.width <= 0.98);
-    if (usableVertical.length >= 4 && usableHorizontal.length >= 8) {
-      const cols = usableVertical.slice(0, 4);
-      const rows = usableHorizontal;
-      if (cols[3] - cols[0] > canvas.width * 0.65) {
-        let rowBounds = rows.slice();
-        const gaps = rowBounds.slice(1).map((y, i) => y - rowBounds[i]);
-        const sortedGaps = gaps.slice().sort((a, b) => a - b);
-        const medianGap = sortedGaps.length ? sortedGaps[Math.floor(sortedGaps.length / 2)] : 0;
-        // On the first voter page, the header bottom rule can sit close to
-        // the first card row. Drop it when that gap is much smaller than row pitch.
-        if (gaps.length > 1 && medianGap > 0 && gaps[0] < medianGap * 0.45) {
-          rowBounds = rowBounds.slice(1);
-        }
-        rowBounds = rowBounds.filter((y, i) => i === 0 || y - rowBounds[i - 1] > canvas.height * 0.025);
-        if (rowBounds.length >= 8) {
-          return { xBounds: cols, yBounds: rowBounds, detected: true };
+    let rows = horizontal.filter(y => y / canvas.height >= 0.16);
+    const gaps = rows.slice(1).map((y, i) => y - rows[i]);
+    const sortedGaps = gaps.slice().sort((a, b) => a - b);
+    const medianGap = sortedGaps.length ? sortedGaps[Math.floor(sortedGaps.length / 2)] : 0;
+    // On the first voter page the header bottom rule is close to the first card row.
+    if (gaps.length > 1 && medianGap > 0 && gaps[0] < medianGap * 0.45) rows = rows.slice(1);
+    rows = rows.filter((y, i) => i === 0 || y - rows[i - 1] > canvas.height * 0.025);
+    if (rows.length >= 3) {
+      const vertical = findVerticalRulesInRegion(canvas, rows[0], rows[rows.length - 1], 0.48)
+        .filter(x => x / canvas.width >= 0.02 && x / canvas.width <= 0.98);
+      const left = vertical.find(x => x / canvas.width <= 0.12);
+      const rightCandidates = vertical.filter(x => x / canvas.width >= 0.88);
+      const right = rightCandidates.length ? rightCandidates[rightCandidates.length - 1] : null;
+      if (left != null && right != null && right - left > canvas.width * 0.65) {
+        const span = right - left;
+        const target1 = left + span / 3;
+        const target2 = left + span * 2 / 3;
+        const interior = vertical.filter(x => x > left + span * 0.18 && x < right - span * 0.18);
+        const nearest = target => interior.reduce((best, x) =>
+          best == null || Math.abs(x - target) < Math.abs(best - target) ? x : best, null);
+        const middle1 = nearest(target1);
+        const middle2 = nearest(target2);
+        if (middle1 != null && middle2 != null && middle1 < middle2) {
+          return { xBounds: [left, middle1, middle2, right], yBounds: rows, detected: true };
         }
       }
     }
-    // Fallback ratios for this known computer-generated template after aspect normalization.
-    return {
-      xBounds: [0.035, 0.345, 0.655, 0.965].map(x => Math.round(canvas.width * x)),
-      yBounds: Array.from({ length: 10 }, (_, i) => Math.round(canvas.height * (0.205 + i * 0.078))),
-      detected: false
-    };
+    return null;
   }
   async function parseChunk(pageCanvas, pageNo, row, col, worker, grid) {
     const x0 = grid.xBounds[col], x1 = grid.xBounds[col + 1];
@@ -291,33 +320,46 @@
             const chunks = [];
             const jobs = [];
             const grid = detectVoterGrid(pageCanvas);
-            const rowCount = Math.max(0, grid.yBounds.length - 1);
-            const colCount = Math.max(0, grid.xBounds.length - 1);
-            for (let row = 0; row < rowCount; row++) {
-              for (let col = 0; col < colCount; col++) {
-                const worker = workers[taskIndex++ % workers.length];
-                jobs.push(parseChunk(pageCanvas, pageNo, row, col, worker, grid).then(chunk => {
-                  chunks.push(chunk);
-                }).catch(error => {
-                  chunks.push({ page: pageNo, grid_row: row + 1, grid_column: col + 1,
-                    chunk_id: 'p' + pageNo + '-r' + (row + 1) + '-c' + (col + 1),
-                    text: '', valid_voter_candidate: false, needs_review: true, error: String(error) });
-                }));
+            if (!grid) {
+              const result = await workers[taskIndex++ % workers.length].recognize(pageCanvas);
+              pages.push({
+                page: pageNo, text: result.data.text || embeddedText,
+                embedded_text: embeddedText, ocr_text: result.data.text || '',
+                grid_detection_failed: true, chunk_count: 0,
+                valid_voter_chunk_count: 0, chunks: [], images: []
+              });
+            } else {
+              const rowCount = Math.max(0, grid.yBounds.length - 1);
+              const colCount = Math.max(0, grid.xBounds.length - 1);
+              const chunks = [];
+              const jobs = [];
+              for (let row = 0; row < rowCount; row++) {
+                for (let col = 0; col < colCount; col++) {
+                  const worker = workers[taskIndex++ % workers.length];
+                  jobs.push(parseChunk(pageCanvas, pageNo, row, col, worker, grid).then(chunk => {
+                    chunks.push(chunk);
+                  }).catch(error => {
+                    chunks.push({ page: pageNo, grid_row: row + 1, grid_column: col + 1,
+                      chunk_id: 'p' + pageNo + '-r' + (row + 1) + '-c' + (col + 1),
+                      text: '', valid_voter_candidate: false, needs_review: true, error: String(error) });
+                  }));
+                }
               }
+              await Promise.all(jobs);
+              chunks.sort((a, b) => (a.grid_row - b.grid_row) || (a.grid_column - b.grid_column));
+              const validChunks = chunks.filter(chunk => chunk.valid_voter_candidate);
+              pages.push({
+                page: pageNo,
+                text: validChunks.map(chunk => chunk.text).join('\\n'),
+                embedded_text: embeddedText,
+                ocr_text: chunks.map(chunk => chunk.text).join('\\n'),
+                grid_detected: true,
+                chunk_count: chunks.length,
+                valid_voter_chunk_count: validChunks.length,
+                chunks,
+                images: []
+              });
             }
-            await Promise.all(jobs);
-            chunks.sort((a, b) => (a.grid_row - b.grid_row) || (a.grid_column - b.grid_column));
-            const validChunks = chunks.filter(chunk => chunk.valid_voter_candidate);
-            pages.push({
-              page: pageNo,
-              text: validChunks.map(chunk => chunk.text).join('\\n'),
-              embedded_text: embeddedText,
-              ocr_text: chunks.map(chunk => chunk.text).join('\\n'),
-              chunk_count: chunks.length,
-              valid_voter_chunk_count: validChunks.length,
-              chunks,
-              images: []
-            });
           }
         } finally {
           if (pageCanvas) { pageCanvas.width = 1; pageCanvas.height = 1; }
