@@ -250,7 +250,7 @@ class _HomePageState extends State<HomePage> {
           final ageMatch = RegExp(r'\d{1,3}').firstMatch(ageText);
           output.add({
             'voter_id': id,
-            'serial_number': serialMatch?.group(1)?.replaceAll(RegExp(r'\\s+'), '') ?? '',
+            'serial_number': serialMatch?.group(1)?.replaceAll(RegExp(r'\s+'), '') ?? '',
             'ward': ward,
             'name': _fieldValue(rawText, ['नाम']),
             'relative_name': father.isNotEmpty ? father : husband,
