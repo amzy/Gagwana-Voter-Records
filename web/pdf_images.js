@@ -264,8 +264,8 @@
       y1: word.bbox && word.bbox.y1 || 0
     }));
     const valid = isVoterChunk(text);
-    const deletedStamp = /\\bDELETED\\b/i.test(text) || words.some(w => /^(deleted|delete)$/i.test(w.text));
-    const voterIdMatch = text.match(/\\b(?:[A-Z]{2,4}\\d{6,10}|RJ\\/\\d{2}\\/\\d{3}\\/\\d{5,8})\\b/i);
+    const deletedStamp = /\bDELETED\b/i.test(text) || words.some(w => /^(deleted|delete)$/i.test(w.text));
+    const voterIdMatch = text.match(/\b(?:[A-Z]{2,4}\d{6,10}|RJ\/\d{2}\/\d{3}\/\d{5,8})\b/i);
     return {
       page: pageNo, grid_row: row + 1, grid_column: col + 1,
       chunk_id: 'p' + pageNo + '-r' + (row + 1) + '-c' + (col + 1),
@@ -306,7 +306,7 @@
         await new Promise(resolve => setTimeout(resolve, 0));
         const page = await pdf.getPage(pageNo);
         const textContent = await page.getTextContent();
-        const embeddedText = textContent.items.map(item => item.str || '').join(' ').replace(/\\s+/g, ' ').trim();
+        const embeddedText = textContent.items.map(item => item.str || '').join(' ').replace(/\s+/g, ' ').trim();
         let pageCanvas;
         try {
           pageCanvas = await renderPageCanvas(page, 1.5);
