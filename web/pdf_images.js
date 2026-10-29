@@ -125,8 +125,8 @@
   }
   function isVoterChunk(text) {
     const value = String(text || '');
-    const hasVoterId = /\\b(?:[A-Z]{2,4}\\d{6,10}|RJ\\/\\d{2}\\/\\d{3}\\/\\d{5,8})\\b/i.test(value);
-    const hasSerial = /(?:^|\\s)E?\\s*\\d{1,4}(?:\\s|$)/m.test(value);
+    const hasVoterId = /\b(?:[A-Z]{2,4}\d{6,10}|RJ\/\d{2}\/\d{3}\/\d{5,8})\b/i.test(value);
+    const hasSerial = /(?:^|\s)E?\s*\d{1,4}(?:\s|$)/m.test(value);
     const hasFields = /नाम|नम|पिता|पति|आयु|लिंग|house|age|gender/i.test(value);
     return hasVoterId || (hasSerial && hasFields);
   }
