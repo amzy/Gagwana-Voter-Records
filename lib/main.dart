@@ -242,7 +242,7 @@ class _HomePageState extends State<HomePage> {
       final images = scannedBatches.fold<int>(
         0, (sum, batch) => sum + ((batch['image_count'] as num?)?.toInt() ?? 0));
       setState(() => importStatus =
-        'Extraction complete: $pages page(s), $images embedded image(s). Review the images below and match them to the correct voter before saving. Voter-field parsing and image-to-voter matching are not automatic in this step.');
+        'Hindi OCR complete: $pages page(s), $images embedded image(s). OCR text is shown for review and original PDF text is preserved separately. Possible DELETED stamps are review signals only; per-voter row parsing and photo matching still require confirmation before saving.');
     } catch (error) {
       if (mounted) setState(() => importStatus = 'PDF image extraction failed: $error');
     } finally {
