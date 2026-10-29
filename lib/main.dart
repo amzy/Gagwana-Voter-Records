@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:js_interop';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -476,9 +477,9 @@ class _HomePageState extends State<HomePage> {
                         final image = imageValue as Map<String, dynamic>;
                         final dataUrl = (image['data_url'] ?? '').toString();
                         final comma = dataUrl.indexOf(',');
-                        final bytes = comma >= 0
+                        final Uint8List bytes = comma >= 0
                             ? base64Decode(dataUrl.substring(comma + 1))
-                            : <int>[];
+                            : Uint8List(0);
                         return SizedBox(
                           width: 112, height: 132,
                           child: Column(children: [
