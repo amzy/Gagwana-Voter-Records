@@ -223,14 +223,14 @@ class _HomePageState extends State<HomePage> {
     final nextLabels = r'(?:नाम|पिता का नाम|पति का नाम|लिंग|आयु|मकान संख्या|घर संख्या)';
     final pattern = RegExp('(?:$labelPattern)\\s*[:：-]\\s*(.*?)(?=\\s*(?:$nextLabels)\\s*[:：-]|\\n|$)', multiLine: true, dotAll: true);
     final match = pattern.firstMatch(text);
-    return match?.group(1)?.trim().replaceAll(RegExp(r'\\s+'), ' ') ?? '';
+    return match?.group(1)?.trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
   }
 
   List<Map<String, dynamic>> _recordsFromScannedBatches() {
     final output = <Map<String, dynamic>>[];
     for (final batch in scannedBatches) {
       final filename = (batch['filename'] ?? '').toString();
-      final wardMatch = RegExp(r'ward\\s*(?:no[.-]?)?\\s*0*(\\d+)', caseSensitive: false).firstMatch(filename);
+      final wardMatch = RegExp(r'ward\s*(?:no[.-]?)?\s*0*(\d+)', caseSensitive: false).firstMatch(filename);
       final ward = wardMatch?.group(1)?.padLeft(2, '0') ?? '';
       for (final pageValue in (batch['pages'] as List? ?? const [])) {
         if (pageValue is! Map) continue;
@@ -242,12 +242,12 @@ class _HomePageState extends State<HomePage> {
           final id = (chunk['voter_id_candidate'] ?? '').toString().trim();
           final rawText = (chunk['raw_text'] ?? chunk['text'] ?? '').toString();
           if (id.isEmpty) continue;
-          final serialMatch = RegExp(r'(?:^|\\s)(E?\\s*\\d{1,4})(?:\\s|$)', multiLine: true).firstMatch(rawText);
+          final serialMatch = RegExp(r'(?:^|\s)(E?\s*\d{1,4})(?:\s|$)', multiLine: true).firstMatch(rawText);
           final father = _fieldValue(rawText, ['पिता का नाम']);
           final husband = _fieldValue(rawText, ['पति का नाम']);
           final gender = _fieldValue(rawText, ['लिंग']);
           final ageText = _fieldValue(rawText, ['आयु', 'उम्र']);
-          final ageMatch = RegExp(r'\\d{1,3}').firstMatch(ageText);
+          final ageMatch = RegExp(r'\d{1,3}').firstMatch(ageText);
           output.add({
             'voter_id': id,
             'serial_number': serialMatch?.group(1)?.replaceAll(RegExp(r'\\s+'), '') ?? '',
