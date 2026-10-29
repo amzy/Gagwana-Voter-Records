@@ -17,6 +17,9 @@ external JSPromise<JSString> _sqliteSaveParsedVoters(JSString recordsJson);
 @JS('gagwanaSqlite.exportDb')
 external JSPromise<JSBoolean> _sqliteExportDb();
 
+@JS('gagwanaSqlite.shareDb')
+external JSPromise<JSString> _sqliteShareDb();
+
 @JS('gagwanaSqlite.importDb')
 external JSPromise<JSString> _sqliteImportDb(JSString base64);
 
@@ -187,6 +190,26 @@ class _HomePageState extends State<HomePage> {
       if (mounted) setState(() => importStatus = 'SQLite backup exported as voter_records.db.');
     } catch (error) {
       if (mounted) setState(() => importStatus = 'Could not export SQLite backup: $error');
+    }
+  }
+
+  Future<void> shareLocalDatabase() async {
+    setState(() { uploading = true; importStatus = 'Preparing database for sharing…'; });
+    try {
+      await _sqliteCall('init');
+      final result = jsonDecode((await _sqliteShareDb().toDart).toDart) as Map<String, dynamic>;
+      if (!mounted) return;
+      if (result['cancelled'] == true) {
+        setState(() => importStatus = 'Database sharing cancelled.');
+      } else if (result['method'] == 'share') {
+        setState(() => importStatus = 'Share sheet opened. Choose WhatsApp and select the recipient.');
+      } else {
+        setState(() => importStatus = 'Database downloaded. WhatsApp opened with sharing instructions. Attach gagwana_voter_records.db to the chat; the recipient can use Import .db backup.');
+      }
+    } catch (error) {
+      if (mounted) setState(() => importStatus = 'Could not share database: $error');
+    } finally {
+      if (mounted) setState(() => uploading = false);
     }
   }
 
@@ -499,6 +522,9 @@ class _HomePageState extends State<HomePage> {
             OutlinedButton.icon(
               onPressed: uploading ? null : exportLocalDatabase,
               icon: const Icon(Icons.download), label: const Text('Export .db backup')),
+            OutlinedButton.icon(
+              onPressed: uploading ? null : shareLocalDatabase,
+              icon: const Icon(Icons.share), label: const Text('Share via WhatsApp')),
             OutlinedButton.icon(
               onPressed: uploading ? null : importLocalDatabase,
               icon: const Icon(Icons.upload_file), label: const Text('Import .db backup')),
