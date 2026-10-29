@@ -220,7 +220,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       uploading = true;
       scannedBatches.clear();
-      importStatus = 'Extracting embedded images and page text…';
+      importStatus = 'Loading Hindi OCR and reading PDF pages…';
     });
     try {
       for (final file in selectedPdfs) {
@@ -434,7 +434,7 @@ class _HomePageState extends State<HomePage> {
       icon: uploading
           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
           : const Icon(Icons.document_scanner),
-      label: Text(uploading ? 'Extracting images…' : 'Extract PDF images'),
+      label: Text(uploading ? 'Reading PDF pages…' : 'Run Hindi OCR'),
     ),
     const SizedBox(height: 10),
     if (importStatus.isNotEmpty) ...[
@@ -464,7 +464,7 @@ class _HomePageState extends State<HomePage> {
                   dense: true,
                   title: Text('Page ${page['page']}'),
                   subtitle: Text((page['text'] ?? '').toString().isEmpty
-                      ? 'No Hindi OCR text recognised on this page'
+                      ? 'No readable OCR text on this page'
                       : (page['text'] ?? '').toString(),
                       maxLines: 4, overflow: TextOverflow.ellipsis),
                 ),
@@ -529,7 +529,7 @@ class _HomePageState extends State<HomePage> {
       )),
     ],
     const SizedBox(height: 10),
-    const Text('Scanning stages page text for review. Voter rows, photos, and deletion marks still require structured parsing and review before records are saved.'),
+    const Text('Hindi OCR reads the original page images to avoid broken PDF font mappings. Photo extraction is paused in this fast scan to prevent embedded-image stalls; voter-row parsing and photo matching are not saved automatically.'),
 
   ]);
 }
