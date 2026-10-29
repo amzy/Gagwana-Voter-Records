@@ -190,9 +190,9 @@
   }
   function detectVoterGrid(canvas) {
     // Locate actual printed rules in the normalized scan, not fixed pixel positions.\n    // Vertical rules must span at least half the page height; this excludes\n    // repeated photo edges that otherwise look like false column boundaries.
-    const horizontal = findRuleLines(canvas, 'horizontal', 0.17, 0.97, 0.34);
+    const horizontal = findRuleLines(canvas, 'horizontal', 0.12, 0.97, 0.34);
     const vertical = findRuleLines(canvas, 'vertical', 0.015, 0.985, 0.50);
-    const usableHorizontal = horizontal.filter(y => y / canvas.height >= 0.19);
+    const usableHorizontal = horizontal.filter(y => y / canvas.height >= 0.16);
     const usableVertical = vertical.filter(x => x / canvas.width >= 0.02 && x / canvas.width <= 0.98);
     if (usableVertical.length >= 4 && usableHorizontal.length >= 8) {
       const cols = usableVertical.slice(0, 4);
