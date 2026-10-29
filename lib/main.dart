@@ -52,19 +52,59 @@ class _GagwanaAppState extends State<GagwanaApp> {
 
   ThemeData _theme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF1769FF), brightness: brightness);
+    const brand = Color(0xFF0866FF);
+    final scheme = ColorScheme.fromSeed(
+      seedColor: brand,
+      brightness: brightness,
+      surface: dark ? const Color(0xFF101B2A) : Colors.white,
+    );
+    final radius = BorderRadius.circular(18);
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: dark ? const Color(0xFF080D14) : const Color(0xFFF4F7FC),
-      cardTheme: CardThemeData(
+      scaffoldBackgroundColor: dark ? const Color(0xFF07111F) : const Color(0xFFF3F7FD),
+      appBarTheme: AppBarTheme(
+        backgroundColor: dark ? const Color(0xFF0B1727) : const Color(0xFFF8FAFF),
+        foregroundColor: dark ? const Color(0xFFF4F7FC) : const Color(0xFF151D2B),
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
-        color: dark ? const Color(0xFF111923) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: dark ? const Color(0xFF0B1727) : Colors.white,
+        indicatorColor: dark ? const Color(0xFF123B72) : const Color(0xFFDCE9FF),
+        elevation: 8,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+          fontSize: 11,
+          fontWeight: states.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w500,
+        )),
+      ),
+      cardTheme: CardThemeData(
+        elevation: dark ? 0 : 1,
+        shadowColor: Colors.black.withValues(alpha: .045),
+        color: dark ? const Color(0xFF101B2A) : Colors.white,
+        surfaceTintColor: Colors.transparent,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(color: dark ? const Color(0xFF203047) : const Color(0xFFE8EEF7)),
+        ),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: dark ? const Color(0xFF1A2635) : const Color(0xFFF2F5FA),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+        fillColor: dark ? const Color(0xFF132238) : Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        hintStyle: TextStyle(color: dark ? const Color(0xFF9AAAC0) : const Color(0xFF8491A5)),
+        border: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: dark ? const Color(0xFF263950) : const Color(0xFFDCE5F1))),
+        enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: dark ? const Color(0xFF263950) : const Color(0xFFDCE5F1))),
+        focusedBorder: OutlineInputBorder(borderRadius: radius, borderSide: const BorderSide(color: brand, width: 1.5)),
+      ),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        side: BorderSide(color: dark ? const Color(0xFF2A3C54) : const Color(0xFFDCE5F1)),
+        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+      ),
     );
   }
 }
@@ -566,25 +606,120 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget recordCard(Voter v) => Card(margin: const EdgeInsets.only(bottom:10), child: InkWell(
-    borderRadius: BorderRadius.circular(20),
-    onTap: () => showModalBottomSheet<void>(context: context, isScrollControlled: true, showDragHandle: true,
-      builder: (_) => detailSheet(v)),
-    child: Padding(padding: const EdgeInsets.all(14), child: Row(children: [
-      CircleAvatar(radius: 25, backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        child: Icon(Icons.person, size: 30, color: Theme.of(context).colorScheme.onPrimaryContainer)),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [Expanded(child: Text(v.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize:16))),
-          badge(v.status)]),
-        const SizedBox(height: 4), Text('Relative: ${v.relative}'),
-        const SizedBox(height: 5), Text('ID: ${v.id}', style: Theme.of(context).textTheme.bodySmall),
-        Text('Ward ${v.ward} • Serial ${v.serial} • Age ${v.age}',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-      ])),
-      const Icon(Icons.chevron_right),
-    ])),
-  ));
+  Widget recordCard(Voter v) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final initial = v.name.trim().isEmpty ? '•' : v.name.trim().substring(0, 1);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          useSafeArea: true,
+          builder: (_) => detailSheet(v),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 54,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: dark ? const Color(0xFF18304D) : const Color(0xFFEAF2FF),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                alignment: Alignment.center,
+                child: Text(initial, style: TextStyle(
+                  fontSize: 25,
+                  fontWeight: FontWeight.w800,
+                  color: theme.colorScheme.primary,
+                )),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            v.name.trim().isEmpty ? 'Name unavailable' : v.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              height: 1.2,
+                              letterSpacing: -.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        badge(v.status),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Voter ID  ·  ${v.id}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      v.relative.trim().isEmpty ? 'Relative name unavailable' : v.relative,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 9),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _recordMeta(Icons.location_on_outlined, 'Ward ${v.ward}'),
+                        _recordMeta(Icons.numbers_rounded, 'Serial ${v.serial}'),
+                        _recordMeta(Icons.cake_outlined, v.age > 0 ? 'Age ${v.age}' : 'Age —'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 2),
+              Padding(
+                padding: const EdgeInsets.only(top: 18),
+                child: Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _recordMeta(IconData icon, String label) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(
+      color: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF17263A)
+          : const Color(0xFFF3F6FB),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
+      const SizedBox(width: 4),
+      Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+    ]),
+  );
 
   Widget badge(Status s) {
     final c = s == Status.active ? const Color(0xFF16A765) : s == Status.flagged ? const Color(0xFFF59E0B) : const Color(0xFFEF4444);
