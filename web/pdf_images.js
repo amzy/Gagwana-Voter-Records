@@ -123,6 +123,67 @@
       }
     });
   }
+  function isVoterChunk(text) {
+    const value = String(text || '');
+    const hasVoterId = /\\b(?:[A-Z]{2,4}\\d{6,10}|RJ\\/\\d{2}\\/\\d{3}\\/\\d{5,8})\\b/i.test(value);
+    const hasSerial = /(?:^|\\s)E?\\s*\\d{1,4}(?:\\s|$)/m.test(value);
+    const hasFields = /नाम|नम|पिता|पति|आयु|लिंग|house|age|gender/i.test(value);
+    return hasVoterId || (hasSerial && hasFields);
+  }
+  async function renderPageCanvas(page, scale) {
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('Could not create page canvas.');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    return canvas;
+  }
+  function cropCanvas(source, x, y, width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.floor(width));
+    canvas.height = Math.max(1, Math.floor(height));
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('Could not create voter-card crop.');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(source, x, y, width, height, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+  async function parseChunk(pageCanvas, pageNo, row, col, worker) {
+    const x0 = Math.round(pageCanvas.width * (0.035 + col * 0.31));
+    const x1 = Math.round(pageCanvas.width * (0.035 + (col + 1) * 0.31));
+    const y0 = Math.round(pageCanvas.height * (0.205 + row * 0.078));
+    const y1 = Math.round(pageCanvas.height * (0.205 + (row + 1) * 0.078));
+    const crop = cropCanvas(pageCanvas, x0, y0, x1 - x0, y1 - y0);
+    const result = await worker.recognize(crop);
+    const text = (result.data.text || '').trim();
+    const words = (result.data.words || []).map(word => ({
+      text: word.text || '',
+      confidence: Math.round(word.confidence || 0),
+      x0: word.bbox && word.bbox.x0 || 0,
+      y0: word.bbox && word.bbox.y0 || 0,
+      x1: word.bbox && word.bbox.x1 || 0,
+      y1: word.bbox && word.bbox.y1 || 0
+    }));
+    const valid = isVoterChunk(text);
+    const deletedStamp = /\\bDELETED\\b/i.test(text) || words.some(w => /^(deleted|delete)$/i.test(w.text));
+    const voterIdMatch = text.match(/\\b(?:[A-Z]{2,4}\\d{6,10}|RJ\\/\\d{2}\\/\\d{3}\\/\\d{5,8})\\b/i);
+    return {
+      page: pageNo, grid_row: row + 1, grid_column: col + 1,
+      chunk_id: 'p' + pageNo + '-r' + (row + 1) + '-c' + (col + 1),
+      text, confidence: words.length ? Math.round(words.reduce((n, w) => n + w.confidence, 0) / words.length) : 0,
+      valid_voter_candidate: valid, voter_id_candidate: voterIdMatch ? voterIdMatch[0] : null,
+      deleted_stamp_candidate: deletedStamp,
+      needs_review: !valid || deletedStamp || words.some(w => w.confidence < 55),
+      // This is the full voter-card crop (including its photo) for the separate
+      // image task; the crop is not yet a verified isolated portrait.
+      chunk_image_data_url: crop.toDataURL('image/jpeg', 0.78)
+    };
+  }
   async function extractImages(base64, filename) {
     const pdfjs = await loadPdfJs();
     const binary = atob(base64);
@@ -130,47 +191,79 @@
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const pdf = await pdfjs.getDocument({ data: bytes }).promise;
     const pages = [];
-    let worker = null;
+    const workers = [];
     try {
-      // OCR is the priority. Do not extract every embedded face image here:
-      // that can block for seconds per unresolved PDF.js image object.
-      worker = await Promise.race([
-        getOcrWorker(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Hindi OCR engine took too long to start. Reload and retry; check the network connection.')), 45000))
+      const Tesseract = await Promise.race([
+        loadTesseract(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('OCR library load timed out after 45 seconds. Check internet and retry.')), 45000))
       ]);
+      // Three real Tesseract worker threads balance throughput and browser memory.
+      await Promise.all([0, 1, 2].map(async () => {
+        const worker = await Promise.race([
+          Tesseract.createWorker('hin+eng', 1, {
+            langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+            logger: () => {}
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Hindi OCR worker startup timed out.')), 45000))
+        ]);
+        workers.push(worker);
+      }));
+      let taskIndex = 0;
       for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
         await new Promise(resolve => setTimeout(resolve, 0));
         const page = await pdf.getPage(pageNo);
         const textContent = await page.getTextContent();
         const embeddedText = textContent.items.map(item => item.str || '').join(' ').replace(/\\s+/g, ' ').trim();
-        let ocr = { text: '', words: [], deleted_stamp_candidates: [], error: null };
+        let pageCanvas;
         try {
-          ocr = await Promise.race([
-            ocrPageWithWorker(page, worker),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timed out on page ' + pageNo)), 30000))
-          ]);
-        } catch (error) {
-          ocr.error = String(error && error.message || error);
+          pageCanvas = await renderPageCanvas(page, 1.5);
+          // The sample has two cover/map pages, followed by 3-column x 9-row
+          // voter-card grids. Keep cover pages as whole-page OCR.
+          if (pageNo <= 2) {
+            const result = await workers[taskIndex++ % workers.length].recognize(pageCanvas);
+            const text = result.data.text || embeddedText;
+            pages.push({ page: pageNo, text, embedded_text: embeddedText, ocr_text: result.data.text || '', chunk_count: 0, chunks: [], images: [] });
+          } else {
+            const chunks = [];
+            const jobs = [];
+            for (let row = 0; row < 9; row++) {
+              for (let col = 0; col < 3; col++) {
+                const worker = workers[taskIndex++ % workers.length];
+                jobs.push(parseChunk(pageCanvas, pageNo, row, col, worker).then(chunk => {
+                  chunks.push(chunk);
+                }).catch(error => {
+                  chunks.push({ page: pageNo, grid_row: row + 1, grid_column: col + 1,
+                    chunk_id: 'p' + pageNo + '-r' + (row + 1) + '-c' + (col + 1),
+                    text: '', valid_voter_candidate: false, needs_review: true, error: String(error) });
+                }));
+              }
+            }
+            await Promise.all(jobs);
+            chunks.sort((a, b) => (a.grid_row - b.grid_row) || (a.grid_column - b.grid_column));
+            const validChunks = chunks.filter(chunk => chunk.valid_voter_candidate);
+            pages.push({
+              page: pageNo,
+              text: validChunks.map(chunk => chunk.text).join('\\n'),
+              embedded_text: embeddedText,
+              ocr_text: chunks.map(chunk => chunk.text).join('\\n'),
+              chunk_count: chunks.length,
+              valid_voter_chunk_count: validChunks.length,
+              chunks,
+              images: []
+            });
+          }
+        } finally {
+          if (pageCanvas) { pageCanvas.width = 1; pageCanvas.height = 1; }
         }
-        const text = ocr.text || embeddedText;
-        pages.push({
-          page: pageNo,
-          text,
-          embedded_text: embeddedText,
-          ocr_text: ocr.text,
-          ocr_words: ocr.words,
-          deleted_stamp_candidates: ocr.deleted_stamp_candidates,
-          ocr_error: ocr.error || null,
-          images: []
-        });
       }
     } finally {
-      if (ocrWorkerPromise) {
-        try { await (await ocrWorkerPromise).terminate(); } catch (_) {}
-        ocrWorkerPromise = null;
-      }
+      await Promise.all(workers.map(async worker => {
+        try { await worker.terminate(); } catch (_) {}
+      }));
     }
-    return JSON.stringify({ filename, page_count: pdf.numPages, image_count: 0, pages });
+    const chunkCount = pages.reduce((sum, page) => sum + (page.chunk_count || 0), 0);
+    const validCount = pages.reduce((sum, page) => sum + (page.valid_voter_chunk_count || 0), 0);
+    return JSON.stringify({ filename, page_count: pdf.numPages, image_count: 0, chunk_count: chunkCount, valid_voter_chunk_count: validCount, pages });
   }
   window.gagwanaPdfImages = { extractImages };
 })();
