@@ -245,8 +245,13 @@ class _HomePageState extends State<HomePage> {
         0, (sum, batch) => sum + ((batch['chunk_count'] as num?)?.toInt() ?? 0));
       final validChunks = scannedBatches.fold<int>(
         0, (sum, batch) => sum + ((batch['valid_voter_chunk_count'] as num?)?.toInt() ?? 0));
+      final reviewPages = scannedBatches.fold<int>(0, (sum, batch) =>
+        sum + ((batch['pages'] as List? ?? const []).where((page) =>
+          page is Map && page['grid_detection_failed'] == true).length));
       setState(() => importStatus =
-        'Parallel Hindi OCR complete: $pages page(s), $chunks grid chunks, $validChunks valid voter candidates. $images embedded photo(s) extracted. Review uncertain names and DELETED stamps; this scan does not save voter records yet.');
+        'Parallel Hindi OCR complete: $pages page(s), $chunks grid chunks, $validChunks valid voter candidates. '
+        '$reviewPages page(s) used full-page OCR because the grid was not confidently detected. '
+        'Review uncertain names and DELETED stamps; this scan does not save voter records yet.');
     } catch (error) {
       if (mounted) setState(() => importStatus = 'PDF image extraction failed: $error');
     } finally {
