@@ -813,7 +813,44 @@ class _HomePageState extends State<HomePage> {
     child: SingleChildScrollView(child: Column(crossAxisAlignment:CrossAxisAlignment.start,children: [
       Text('Voter details', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
       const SizedBox(height:16),
-      const Center(child: CircleAvatar(radius:42, child: Icon(Icons.person,size:48))),
+      Center(
+        child: ClipOval(
+          child: SizedBox(
+            width: 84,
+            height: 84,
+            child: v.hasPhoto
+                ? FutureBuilder<Uint8List?>(
+                    future: _photoFutures.putIfAbsent(v.id, () => _loadVoterPhoto(v.id)),
+                    builder: (context, snapshot) {
+                      final bytes = snapshot.data;
+                      if (bytes != null && bytes.isNotEmpty) {
+                        return Image.memory(
+                          bytes,
+                          width: 84,
+                          height: 84,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                          errorBuilder: (_, __, ___) => _detailPhotoPlaceholder(v),
+                        );
+                      }
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Container(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          alignment: Alignment.center,
+                          child: const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      }
+                      return _detailPhotoPlaceholder(v);
+                    },
+                  )
+                : _detailPhotoPlaceholder(v),
+          ),
+        ),
+      ),
       const SizedBox(height:10),
       Center(child: Text(v.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold))),
       const SizedBox(height:14),
@@ -823,6 +860,14 @@ class _HomePageState extends State<HomePage> {
       detailRow('Source','${v.pdf}, page ${v.page}'),
     ])),
   ));
+
+  Widget _detailPhotoPlaceholder(Voter v) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final name = v.name.trim();
+    final initial = name.isEmpty ? '•' : name.substring(0, 1);
+    return _photoPlaceholder(initial, theme, dark);
+  }
 
   Widget detailRow(String label,String value) => Padding(padding: const EdgeInsets.symmetric(vertical:8),
     child: Row(children: [SizedBox(width:135, child: Text(label, style: TextStyle(color:Theme.of(context).colorScheme.onSurfaceVariant))),
