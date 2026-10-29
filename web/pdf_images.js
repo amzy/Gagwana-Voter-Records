@@ -123,8 +123,29 @@
       }
     });
   }
+  // Correct only known field labels and closed-set values when context is explicit.
+  function normalizeKnownFields(input) {
+    const original = String(input || '');
+    let text = original;
+    const corrections = [];
+    const apply = (field, pattern, replacement) => {
+      const before = text;
+      text = text.replace(pattern, replacement);
+      if (text !== before) corrections.push({ field, before, after: text });
+    };
+    const genderLabel = '(?:लिंग|लिग|लिंगः)\\s*[:：-]?\\s*';
+    const maleValue = '(?:पुरुष|पुरूष|पु[ररुू]ष|पुरुष्|पु[ररुू]स|पु[ररुू]ष़)';
+    const femaleValue = '(?:स्त्री|स्त्रि|स्री|स्त्रीं|महिला)';
+    apply('gender_male', new RegExp('(' + genderLabel + ')' + maleValue, 'giu'), '$1पुरुष');
+    apply('gender_female', new RegExp('(' + genderLabel + ')' + femaleValue, 'giu'), '$1स्त्री');
+    apply('label_gender', /लि[ंम]ग(?=\\s*[:：-]|\\s+(?:पुरुष|पुरूष|स्त्री|स्री))/gu, 'लिंग');
+    apply('label_age', /(?:आयु|आयुं|उम्र|वय)(?=\\s*[:：-]|\\s+\\d)/gu, 'आयु');
+    apply('label_house', /(?:मकान\\s*(?:संख्या|सं\\.?|नं\\.?)|घर\\s*(?:संख्या|नं\\.?)|मकान\\s*नं)(?=\\s*[:：-]|\\s+\\S)/gu, 'मकान संख्या');
+    text = text.replace(/([^\\n])\\s*(लिंग|आयु|मकान संख्या)\\s*[:：-]\\s*/gu, '$1\\n$2: ');
+    return { original_text: original, normalized_text: text, corrections };
+  }
   function isVoterChunk(text) {
-    const value = String(text || '');
+    const value = normalizeKnownFields(text).normalized_text;
     const hasVoterId = /\b(?:[A-Z]{2,4}\d{6,10}|RJ\/\d{2}\/\d{3}\/\d{5,8})\b/i.test(value);
     const hasSerial = /(?:^|\s)E?\s*\d{1,4}(?:\s|$)/m.test(value);
     const hasFields = /नाम|नम|पिता|पति|आयु|लिंग|house|age|gender/i.test(value);
@@ -254,7 +275,9 @@
     const y0 = grid.yBounds[row], y1 = grid.yBounds[row + 1];
     const crop = cropCanvas(pageCanvas, x0, y0, x1 - x0, y1 - y0);
     const result = await worker.recognize(crop);
-    const text = (result.data.text || '').trim();
+    const rawText = (result.data.text || '').trim();
+    const normalized = normalizeKnownFields(rawText);
+    const text = normalized.normalized_text;
     const words = (result.data.words || []).map(word => ({
       text: word.text || '',
       confidence: Math.round(word.confidence || 0),
@@ -270,7 +293,7 @@
       page: pageNo, grid_row: row + 1, grid_column: col + 1,
       chunk_id: 'p' + pageNo + '-r' + (row + 1) + '-c' + (col + 1),
       grid_detected: grid.detected,
-      text, confidence: words.length ? Math.round(words.reduce((n, w) => n + w.confidence, 0) / words.length) : 0,
+      text, raw_text: rawText, field_corrections: normalized.corrections, confidence: words.length ? Math.round(words.reduce((n, w) => n + w.confidence, 0) / words.length) : 0,
       valid_voter_candidate: valid, voter_id_candidate: voterIdMatch ? voterIdMatch[0] : null,
       deleted_stamp_candidate: deletedStamp,
       needs_review: !valid || deletedStamp || words.some(w => w.confidence < 55),
