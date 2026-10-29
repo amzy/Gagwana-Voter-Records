@@ -138,10 +138,14 @@
     const femaleValue = '(?:स्त्री|स्त्रि|स्री|स्त्रीं|महिला)';
     apply('gender_male', new RegExp('(' + genderLabel + ')' + maleValue, 'giu'), '$1पुरुष');
     apply('gender_female', new RegExp('(' + genderLabel + ')' + femaleValue, 'giu'), '$1स्त्री');
+    // Normalize known voter labels, while leaving the person names untouched.
+    apply('label_name', /(?:नाम|ना[ममं]|नम)(?=\\s*[:：-])/gu, 'नाम');
+    apply('label_father', /(?:पिता\\s*का\\s*नाम|पिता\\s*क[ाे]\\s*नाम|पिता\\s*का\\s*नम)(?=\\s*[:：-])/gu, 'पिता का नाम');
+    apply('label_husband', /(?:पति\\s*का\\s*नाम|पति\\s*क[ाे]\\s*नाम|पति\\s*का\\s*नम)(?=\\s*[:：-])/gu, 'पति का नाम');
     apply('label_gender', /लि[ंम]ग(?=\\s*[:：-]|\\s+(?:पुरुष|पुरूष|स्त्री|स्री))/gu, 'लिंग');
     apply('label_age', /(?:आयु|आयुं|उम्र|वय)(?=\\s*[:：-]|\\s+\\d)/gu, 'आयु');
     apply('label_house', /(?:मकान\\s*(?:संख्या|सं\\.?|नं\\.?)|घर\\s*(?:संख्या|नं\\.?)|मकान\\s*नं)(?=\\s*[:：-]|\\s+\\S)/gu, 'मकान संख्या');
-    text = text.replace(/([^\\n])\\s*(लिंग|आयु|मकान संख्या)\\s*[:：-]\\s*/gu, '$1\\n$2: ');
+    text = text.replace(/([^\\n])\\s*(नाम|पिता का नाम|पति का नाम|लिंग|आयु|मकान संख्या)\\s*[:：-]\\s*/gu, '$1\\n$2: ');
     return { original_text: original, normalized_text: text, corrections };
   }
   function isVoterChunk(text) {
