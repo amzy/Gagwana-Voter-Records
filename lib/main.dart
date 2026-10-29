@@ -14,6 +14,9 @@ external JSPromise<JSString> _sqliteStats();
 @JS('gagwanaSqlite.listVoters')
 external JSPromise<JSString> _sqliteListVoters();
 
+@JS('gagwanaSqlite.getPhotoBlob')
+external JSPromise<JSString> _sqliteGetPhotoBlob(JSString voterId);
+
 @JS('gagwanaSqlite.saveParsedVoters')
 external JSPromise<JSString> _sqliteSaveParsedVoters(JSString recordsJson);
 
@@ -117,10 +120,11 @@ enum Status { active, flagged, deleted }
 
 class Voter {
   const Voter(this.id, this.serial, this.ward, this.name, this.relative, this.age, this.status,
-      {this.pdf = 'Ward_05_Voter_List.pdf', this.page = 5});
+      {this.pdf = 'Ward_05_Voter_List.pdf', this.page = 5, this.hasPhoto = false});
   final String id, ward, name, relative, pdf;
   final int serial, age, page;
   final Status status;
+  final bool hasPhoto;
 }
 
 const records = <Voter>[
@@ -150,6 +154,7 @@ class _HomePageState extends State<HomePage> {
   String importStatus = '';
   final List<Map<String, dynamic>> scannedBatches = [];
   List<Voter> databaseVoters = [];
+  final Map<String, Future<Uint8List?>> _photoFutures = {};
 
   @override
   void initState() {
@@ -180,9 +185,11 @@ class _HomePageState extends State<HomePage> {
         deleted ? Status.deleted : (review ? Status.flagged : Status.active),
         pdf: (row['source_pdf'] ?? '').toString(),
         page: (row['source_page'] as num?)?.toInt() ?? 0,
+        hasPhoto: row['photo_available'] == true,
       );
     }).toList();
     if (!mounted) return;
+    _photoFutures.clear();
     setState(() {
       databaseVoters = loaded;
       databaseReady = true;
@@ -644,19 +651,29 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 54,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: dark ? const Color(0xFF18304D) : const Color(0xFFEAF2FF),
-                  borderRadius: BorderRadius.circular(16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SizedBox(
+                  width: 54,
+                  height: 60,
+                  child: v.hasPhoto
+                      ? FutureBuilder<Uint8List?>(
+                          future: _photoFutures.putIfAbsent(v.id, () => _loadVoterPhoto(v.id)),
+                          builder: (context, snapshot) {
+                            final bytes = snapshot.data;
+                            if (bytes != null && bytes.isNotEmpty) {
+                              return Image.memory(
+                                bytes,
+                                fit: BoxFit.cover,
+                                gaplessPlayback: true,
+                                errorBuilder: (_, __, ___) => _photoPlaceholder(initial, theme, dark),
+                              );
+                            }
+                            return _photoPlaceholder(initial, theme, dark);
+                          },
+                        )
+                      : _photoPlaceholder(initial, theme, dark),
                 ),
-                alignment: Alignment.center,
-                child: Text(initial, style: TextStyle(
-                  fontSize: 25,
-                  fontWeight: FontWeight.w800,
-                  color: theme.colorScheme.primary,
-                )),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -723,6 +740,26 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+  Future<Uint8List?> _loadVoterPhoto(String voterId) async {
+    try {
+      final encoded = (await _sqliteGetPhotoBlob(voterId.toJS).toDart).toDart;
+      if (encoded.isEmpty) return null;
+      return base64Decode(encoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _photoPlaceholder(String initial, ThemeData theme, bool dark) => Container(
+    color: dark ? const Color(0xFF18304D) : const Color(0xFFEAF2FF),
+    alignment: Alignment.center,
+    child: Text(initial, style: TextStyle(
+      fontSize: 25,
+      fontWeight: FontWeight.w800,
+      color: theme.colorScheme.primary,
+    )),
+  );
 
   Widget _recordMeta(IconData icon, String label) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
