@@ -181,7 +181,7 @@
       needs_review: !valid || deletedStamp || words.some(w => w.confidence < 55),
       // This is the full voter-card crop (including its photo) for the separate
       // image task; the crop is not yet a verified isolated portrait.
-      chunk_image_data_url: crop.toDataURL('image/jpeg', 0.78)
+      chunk_image_data_url: valid ? crop.toDataURL('image/jpeg', 0.72) : null
     };
   }
   async function extractImages(base64, filename) {
