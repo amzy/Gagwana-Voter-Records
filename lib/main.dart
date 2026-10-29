@@ -250,7 +250,7 @@ class _HomePageState extends State<HomePage> {
           page is Map && page['grid_detection_failed'] == true).length));
       setState(() => importStatus =
         'Parallel Hindi OCR complete: $pages page(s), $chunks grid chunks, $validChunks valid voter candidates. '
-        '$reviewPages page(s) used full-page OCR because the grid was not confidently detected. '
+        '$images embedded photo(s) extracted. $reviewPages page(s) used full-page OCR because the grid was not confidently detected. '
         'Review uncertain names and DELETED stamps; this scan does not save voter records yet.');
     } catch (error) {
       if (mounted) setState(() => importStatus = 'PDF image extraction failed: $error');
