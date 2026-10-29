@@ -198,7 +198,16 @@
       const cols = usableVertical.slice(0, 4);
       const rows = usableHorizontal;
       if (cols[3] - cols[0] > canvas.width * 0.65) {
-        const rowBounds = rows.filter((y, i) => i === 0 || y - rows[i - 1] > canvas.height * 0.025);
+        let rowBounds = rows.slice();
+        const gaps = rowBounds.slice(1).map((y, i) => y - rowBounds[i]);
+        const sortedGaps = gaps.slice().sort((a, b) => a - b);
+        const medianGap = sortedGaps.length ? sortedGaps[Math.floor(sortedGaps.length / 2)] : 0;
+        // On the first voter page, the header bottom rule can sit close to
+        // the first card row. Drop it when that gap is much smaller than row pitch.
+        if (gaps.length > 1 && medianGap > 0 && gaps[0] < medianGap * 0.45) {
+          rowBounds = rowBounds.slice(1);
+        }
+        rowBounds = rowBounds.filter((y, i) => i === 0 || y - rowBounds[i - 1] > canvas.height * 0.025);
         if (rowBounds.length >= 8) {
           return { xBounds: cols, yBounds: rowBounds, detected: true };
         }
