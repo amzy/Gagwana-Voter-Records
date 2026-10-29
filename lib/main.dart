@@ -440,33 +440,133 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget searchScreen() => ListView(padding: const EdgeInsets.fromLTRB(16,12,16,90), children: [
-    Text('Search voter records', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
-    const SizedBox(height: 6),
-    const Text('Search by voter name, relative name, voter ID, or serial number. Voter data remains in Hindi.'),
-    const SizedBox(height: 16),
-    TextField(controller: search, onChanged: (_) => setState(() {}),
-      decoration: InputDecoration(hintText: 'Search name, relative, voter ID, or serial…', prefixIcon: const Icon(Icons.search),
-        suffixIcon: search.text.isEmpty ? null : IconButton(onPressed: () { search.clear(); setState(() {}); }, icon: const Icon(Icons.close)))),
-    const SizedBox(height: 10),
-    Row(children: [
-      Expanded(child: DropdownButtonFormField<String>(initialValue: ward, decoration: const InputDecoration(labelText: 'Ward'),
-        items: ['All wards', ...List.generate(13,(i)=>(i+1).toString().padLeft(2,'0'))]
-          .map((s)=>DropdownMenuItem(value:s,child:Text(s=='All wards'?s:'Ward $s'))).toList(),
-        onChanged:(v)=>setState(()=>ward=v??'All wards'))),
-      const SizedBox(width: 10),
-      Expanded(child: DropdownButtonFormField<String>(initialValue: status, decoration: const InputDecoration(labelText: 'Record status'),
-        items: ['All records','Active only','Flagged only','Deleted only']
-          .map((s)=>DropdownMenuItem(value:s,child:Text(s))).toList(),
-        onChanged:(v)=>setState(()=>status=v??'All records'))),
-    ]),
-    const SizedBox(height: 16),
-    Row(children: [Text('Results', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-      const Spacer(), Text('${filtered.length} records')]),
-    const SizedBox(height: 8),
-    if (filtered.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No records found')))),
-    ...filtered.map(recordCard),
-  ]);
+  Future<void> _showFilters() async {
+    var draftWard = ward;
+    var draftStatus = status;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Filter records', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 18),
+              Text('Ward', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: draftWard,
+                isExpanded: true,
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.location_city_rounded), labelText: 'Select ward'),
+                items: ['All wards', ...List.generate(13, (i) => (i + 1).toString().padLeft(2, '0'))]
+                    .map((v) => DropdownMenuItem(value: v, child: Text(v == 'All wards' ? v : 'Ward $v'))).toList(),
+                onChanged: (v) => setSheetState(() => draftWard = v ?? 'All wards'),
+              ),
+              const SizedBox(height: 16),
+              Text('Record status', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: draftStatus,
+                isExpanded: true,
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.filter_list_rounded), labelText: 'Select status'),
+                items: ['All records', 'Active only', 'Flagged only', 'Deleted only']
+                    .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                onChanged: (v) => setSheetState(() => draftStatus = v ?? 'All records'),
+              ),
+              const SizedBox(height: 22),
+              Row(children: [
+                Expanded(child: OutlinedButton(
+                  onPressed: () => setSheetState(() { draftWard = 'All wards'; draftStatus = 'All records'; }),
+                  child: const Text('Reset'))),
+                const SizedBox(width: 12),
+                Expanded(child: FilledButton(
+                  onPressed: () {
+                    setState(() { ward = draftWard; status = draftStatus; });
+                    Navigator.pop(sheetContext);
+                  },
+                  child: const Text('Show results'))),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget searchScreen() {
+    final theme = Theme.of(context);
+    final activeFilters = (ward != 'All wards' ? 1 : 0) + (status != 'All records' ? 1 : 0);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      children: [
+        Text('Find a voter', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.7)),
+        const SizedBox(height: 6),
+        Text('Search names, voter IDs and serial numbers', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 22),
+        TextField(
+          controller: search,
+          onChanged: (_) => setState(() {}),
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: 'Name, voter ID or serial number',
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: search.text.isEmpty ? null : IconButton(
+              tooltip: 'Clear search',
+              onPressed: () { search.clear(); setState(() {}); },
+              icon: const Icon(Icons.close_rounded)),
+            filled: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _showFilters,
+          icon: const Icon(Icons.tune_rounded),
+          label: Text(activeFilters == 0 ? 'Filters' : 'Filters · $activeFilters active'),
+          style: OutlinedButton.styleFrom(
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Search results', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 3),
+            Text(activeFilters == 0 ? 'All wards · All statuses' : '${ward == 'All wards' ? 'All wards' : 'Ward $ward'} · $status',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ])),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(30)),
+            child: Text('${filtered.length}', style: TextStyle(fontWeight: FontWeight.w800, color: theme.colorScheme.onSecondaryContainer)),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        if (filtered.isEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+              child: Column(children: [
+                Icon(Icons.person_search_rounded, size: 42, color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(height: 12),
+                Text('No voters found', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text('Try another name or adjust your filters.', textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              ]),
+            ),
+          ),
+        ...filtered.map(recordCard),
+      ],
+    );
+  }
 
   Widget recordCard(Voter v) => Card(margin: const EdgeInsets.only(bottom:10), child: InkWell(
     borderRadius: BorderRadius.circular(20),
