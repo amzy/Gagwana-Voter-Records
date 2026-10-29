@@ -1,8 +1,20 @@
 import 'dart:convert';
-import 'dart:js_util' as js_util;
+import 'dart:js_interop';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
+@JS('gagwanaSqlite.init')
+external JSPromise<JSString> _sqliteInit();
+
+@JS('gagwanaSqlite.stats')
+external JSPromise<JSString> _sqliteStats();
+
+@JS('gagwanaSqlite.exportDb')
+external JSPromise<JSBoolean> _sqliteExportDb();
+
+@JS('gagwanaSqlite.importDb')
+external JSPromise<JSString> _sqliteImportDb(JSString base64);
 
 void main() => runApp(const GagwanaApp());
 
@@ -122,17 +134,25 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<dynamic> _sqliteCall(String method, [List<dynamic> args = const []]) async {
-    final sqlite = js_util.getProperty<Object?>(js_util.globalThis, 'gagwanaSqlite');
-    if (sqlite == null) throw Exception('Local SQLite module did not load. Reload the app and check the internet connection.');
-    final result = js_util.callMethod<Object?>(sqlite, method, args);
-    if (result != null) {
-      try {
-        return await js_util.promiseToFuture<Object?>(result);
-      } catch (_) {
-        return result;
+    try {
+      switch (method) {
+        case 'init':
+          return (await _sqliteInit().toDart).toDart;
+        case 'stats':
+          return (await _sqliteStats().toDart).toDart;
+        case 'exportDb':
+          return (await _sqliteExportDb().toDart).toDart;
+        case 'importDb':
+          if (args.isEmpty || args.first is! String) {
+            throw ArgumentError('A base64 SQLite database is required.');
+          }
+          return (await _sqliteImportDb((args.first as String).toJS).toDart).toDart;
+        default:
+          throw ArgumentError('Unsupported SQLite operation: $method');
       }
+    } on JSException catch (error) {
+      throw Exception(error.toString());
     }
-    return result;
   }
 
   Future<void> initializeLocalDatabase() async {
@@ -414,71 +434,7 @@ class _HomePageState extends State<HomePage> {
 
   ]);
 }
-), '');
-    final token = apiToken.text.trim();
-    if (baseUrl.isEmpty || token.isEmpty) {
-      setState(() => importStatus = 'Enter the backend URL and API token before uploading.');
-      return;
-    }
-    setState(() {
-      uploading = true;
-      importStatus = 'Connecting to backend and scanning selected PDFs…';
-      scannedBatches.clear();
-    });
-    var succeeded = 0;
-    final errors = <String>[];
-    for (final file in List<PlatformFile>.from(selectedPdfs)) {
-      try {
-        final bytes = file.bytes;
-        if (bytes == null || bytes.isEmpty) {
-          errors.add('${file.name}: file bytes are unavailable. Re-select the PDF and try again.');
-          continue;
-        }
-        final request = http.MultipartRequest(
-          'POST',
-          Uri.parse('$baseUrl/imports/pdf'),
-        );
-        request.headers['Authorization'] = 'Bearer $token';
-        request.files.add(http.MultipartFile.fromBytes(
-          'file',
-          bytes,
-          filename: file.name,
-        ));
-        final streamed = await request.send().timeout(const Duration(minutes: 5));
-        final response = await http.Response.fromStream(streamed);
-        Map<String, dynamic> payload = {};
-        try {
-          final decoded = jsonDecode(response.body);
-          if (decoded is Map<String, dynamic>) payload = decoded;
-        } catch (_) {
-          // Show a safe status-based message for non-JSON responses.
-        }
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          if (payload['duplicate_upload'] == true) {
-            errors.add('${file.name}: this exact PDF was already scanned (batch ${payload['existing_batch_id']}).');
-          } else {
-            scannedBatches.add(payload);
-            succeeded++;
-          }
-        } else {
-          final detail = payload['detail']?.toString() ?? response.reasonPhrase ?? 'HTTP ${response.statusCode}';
-          errors.add('${file.name}: $detail');
-        }
-        if (mounted) setState(() {});
-      } catch (error) {
-        errors.add('${file.name}: cannot reach backend. Confirm it is running, the URL is correct, and CORS allows this localhost origin. Details: ${error.runtimeType}.');
-      }
-    }
-    if (!mounted) return;
-    setState(() {
-      uploading = false;
-      importStatus = [
-        'Scanned successfully: $succeeded of ${selectedPdfs.length} PDF(s).',
-        if (errors.isNotEmpty) errors.join('\\n'),
-        if (succeeded > 0) 'Page text is staged for review. This does not yet save parsed voter records.',
-      ].join('\\n\\n');
-    });
-  }
+
 
   @override
   Widget build(BuildContext context) {
