@@ -101,9 +101,13 @@ class _GagwanaAppState extends State<GagwanaApp> {
         focusedBorder: OutlineInputBorder(borderRadius: radius, borderSide: const BorderSide(color: brand, width: 1.5)),
       ),
       chipTheme: ChipThemeData(
+        backgroundColor: dark ? const Color(0xFF132238) : const Color(0xFFF5F8FD),
+        selectedColor: dark ? const Color(0xFF244A82) : const Color(0xFFDCE9FF),
+        checkmarkColor: dark ? const Color(0xFFEAF2FF) : const Color(0xFF0849B8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         side: BorderSide(color: dark ? const Color(0xFF2A3C54) : const Color(0xFFDCE5F1)),
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+        labelStyle: TextStyle(color: dark ? const Color(0xFFF0F5FF) : const Color(0xFF17253A), fontWeight: FontWeight.w600, fontSize: 12),
+        secondaryLabelStyle: TextStyle(color: dark ? const Color(0xFFF0F5FF) : const Color(0xFF17253A), fontWeight: FontWeight.w600, fontSize: 12),
       ),
     );
   }
@@ -469,7 +473,11 @@ class _HomePageState extends State<HomePage> {
           ]),
         Expanded(child: Center(child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
-          child: tab == 0 ? searchScreen() : importScreen()))),
+          child: IndexedStack(
+            index: tab,
+            children: [searchScreen(), importScreen()],
+          ),
+        ))),
       ]),
       bottomNavigationBar: wide ? null : NavigationBar(
         selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v),
@@ -488,48 +496,58 @@ class _HomePageState extends State<HomePage> {
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      constraints: BoxConstraints(
+        maxWidth: 640,
+        maxHeight: MediaQuery.sizeOf(context).height * .78,
+      ),
       builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Filter records', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 18),
-              Text('Ward', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                'All wards', ...List.generate(13, (i) => (i + 1).toString().padLeft(2, '0'))
-              ].map((v) => ChoiceChip(
-                label: Text(v == 'All wards' ? v : 'Ward $v'),
-                selected: draftWard == v,
-                onSelected: (_) => setSheetState(() => draftWard = v),
-              )).toList()),
-              const SizedBox(height: 20),
-              Text('Record status', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                'All records', 'Active only', 'Flagged only', 'Deleted only'
-              ].map((v) => ChoiceChip(
-                label: Text(v),
-                selected: draftStatus == v,
-                onSelected: (_) => setSheetState(() => draftStatus = v),
-              )).toList()),
-              const SizedBox(height: 22),
-              Row(children: [
-                Expanded(child: OutlinedButton(
-                  onPressed: () => setSheetState(() { draftWard = 'All wards'; draftStatus = 'All records'; }),
-                  child: const Text('Reset'))),
-                const SizedBox(width: 12),
-                Expanded(child: FilledButton(
-                  onPressed: () {
-                    setState(() { ward = draftWard; status = draftStatus; });
-                    Navigator.pop(sheetContext);
-                  },
-                  child: const Text('Show results'))),
-              ]),
-            ],
+        builder: (context, setSheetState) => SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              20, 4, 20, 20 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Filter records', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 18),
+                Text('Ward', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  'All wards', ...List.generate(13, (i) => (i + 1).toString().padLeft(2, '0'))
+                ].map((v) => ChoiceChip(
+                  label: Text(v == 'All wards' ? v : 'Ward $v'),
+                  selected: draftWard == v,
+                  onSelected: (_) => setSheetState(() => draftWard = v),
+                )).toList()),
+                const SizedBox(height: 20),
+                Text('Record status', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  'All records', 'Active only', 'Flagged only', 'Deleted only'
+                ].map((v) => ChoiceChip(
+                  label: Text(v),
+                  selected: draftStatus == v,
+                  onSelected: (_) => setSheetState(() => draftStatus = v),
+                )).toList()),
+                const SizedBox(height: 22),
+                Row(children: [
+                  Expanded(child: OutlinedButton(
+                    onPressed: () => setSheetState(() { draftWard = 'All wards'; draftStatus = 'All records'; }),
+                    child: const Text('Reset'))),
+                  const SizedBox(width: 12),
+                  Expanded(child: FilledButton(
+                    onPressed: () {
+                      setState(() { ward = draftWard; status = draftStatus; });
+                      Navigator.pop(sheetContext);
+                    },
+                    child: const Text('Show results'))),
+                ]),
+              ],
+            ),
           ),
         ),
       ),
