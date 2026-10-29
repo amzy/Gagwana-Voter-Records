@@ -135,35 +135,57 @@
     const pdf = await pdfjs.getDocument({ data: bytes }).promise;
     const pages = [];
     let totalImages = 0;
-    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
-      // Yield to the browser between pages so large voter rolls stay responsive.
-      await new Promise(resolve => setTimeout(resolve, 0));
-      const page = await pdf.getPage(pageNo);
-      const textContent = await page.getTextContent();
-      const text = textContent.items.map(item => item.str || '').join(' ').replace(/\s+/g, ' ').trim();
-      const ops = await page.getOperatorList();
-      const imageIds = [];
-      const seen = new Set();
-      for (let i = 0; i < ops.fnArray.length; i++) {
-        const fn = ops.fnArray[i], args = ops.argsArray[i];
-        if ((fn === pdfjs.OPS.paintImageXObject || fn === pdfjs.OPS.paintImageMaskXObject) &&
-            args && typeof args[0] === 'string' && !seen.has(args[0])) {
-          seen.add(args[0]); imageIds.push(args[0]);
-        } else if (fn === pdfjs.OPS.paintInlineImageXObject && args && args[0]) {
-          const url = imageObjectToDataUrl(args[0]);
-          if (url) { imageIds.push({ inline: url }); }
+    try {
+      for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const page = await pdf.getPage(pageNo);
+        const textContent = await page.getTextContent();
+        const embeddedText = textContent.items.map(item => item.str || '').join(' ').replace(/\\s+/g, ' ').trim();
+        let ocr = { text: '', words: [], deleted_stamp_candidates: [], error: null };
+        try {
+          ocr = await ocrPage(page);
+        } catch (error) {
+          ocr.error = String(error && error.message || error);
         }
+        const text = ocr.text || embeddedText;
+        const ops = await page.getOperatorList();
+        const imageIds = [];
+        const seen = new Set();
+        for (let i = 0; i < ops.fnArray.length; i++) {
+          const op = ops.fnArray[i], args = ops.argsArray[i];
+          if ((op === pdfjs.OPS.paintImageXObject || op === pdfjs.OPS.paintImageMaskXObject) &&
+              args && typeof args[0] === 'string' && !seen.has(args[0])) {
+            seen.add(args[0]);
+            imageIds.push(args[0]);
+          } else if (op === pdfjs.OPS.paintInlineImageXObject && args && args[0]) {
+            const url = imageObjectToDataUrl(args[0]);
+            if (url) imageIds.push({ inline: url });
+          }
+        }
+        const images = [];
+        for (const entry of imageIds) {
+          const dataUrl = typeof entry === 'string' ? await getImage(page, entry) : entry.inline;
+          if (dataUrl) images.push({ index: images.length + 1, data_url: dataUrl });
+        }
+        totalImages += images.length;
+        pages.push({
+          page: pageNo,
+          text,
+          embedded_text: embeddedText,
+          ocr_text: ocr.text,
+          ocr_words: ocr.words,
+          deleted_stamp_candidates: ocr.deleted_stamp_candidates,
+          ocr_error: ocr.error || null,
+          images
+        });
       }
-      const images = [];
-      for (let i = 0; i < imageIds.length; i++) {
-        const entry = imageIds[i];
-        const dataUrl = typeof entry === 'string' ? await getImage(page, entry) : entry.inline;
-        if (dataUrl) images.push({ index: images.length + 1, data_url: dataUrl });
+    } finally {
+      if (ocrWorkerPromise) {
+        try { await (await ocrWorkerPromise).terminate(); } catch (_) {}
+        ocrWorkerPromise = null;
       }
-      totalImages += images.length;
-      pages.push({ page: pageNo, text, embedded_text: embeddedText, ocr_text: ocr.text, ocr_words: ocr.words, deleted_stamp_candidates: ocr.deleted_stamp_candidates, ocr_error: ocr.error || null, images });
     }
-    if (ocrWorkerPromise) { try { await (await ocrWorkerPromise).terminate(); } catch (_) {} ocrWorkerPromise = null; }\n    return JSON.stringify({ filename, page_count: pdf.numPages, image_count: totalImages, pages });
+    return JSON.stringify({ filename, page_count: pdf.numPages, image_count: totalImages, pages });
   }
   window.gagwanaPdfImages = { extractImages };
 })();
