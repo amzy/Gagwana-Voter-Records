@@ -437,8 +437,6 @@ class _HomePageState extends State<HomePage> {
           NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
           NavigationDestination(icon: Icon(Icons.picture_as_pdf), label: 'Import PDFs'),
         ]),
-      floatingActionButton: tab == 0 ? FloatingActionButton.extended(
-        onPressed: pickPdf, icon: const Icon(Icons.upload_file), label: const Text('Upload PDFs')) : null,
     );
   }
 
