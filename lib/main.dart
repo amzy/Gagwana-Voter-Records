@@ -464,10 +464,33 @@ class _HomePageState extends State<HomePage> {
                   dense: true,
                   title: Text('Page ${page['page']}'),
                   subtitle: Text((page['text'] ?? '').toString().isEmpty
-                      ? 'No selectable text on this page'
+                      ? 'No Hindi OCR text recognised on this page'
                       : (page['text'] ?? '').toString(),
-                      maxLines: 3, overflow: TextOverflow.ellipsis),
+                      maxLines: 4, overflow: TextOverflow.ellipsis),
                 ),
+                if ((page['deleted_stamp_candidates'] as List? ?? const []).isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'Possible DELETED stamp detected on page ${page['page']}. '
+                        'Review the stamp against each voter card; this page-level signal '
+                        'does not automatically mark all voters as deleted.',
+                        style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+                      ),
+                    ),
+                  ),
+                if (page['ocr_error'] != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    child: Text('Hindi OCR unavailable: ${page['ocr_error']}'),
+                  ),
                 if (images.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
