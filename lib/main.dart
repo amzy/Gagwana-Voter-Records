@@ -29,6 +29,9 @@ external JSPromise<JSString> _sqliteShareDb();
 @JS('gagwanaSqlite.importDb')
 external JSPromise<JSString> _sqliteImportDb(JSString base64);
 
+@JS('gagwanaSqlite.syncPublishedDb')
+external JSPromise<JSString> _sqliteSyncPublishedDb();
+
 @JS('gagwanaPdfImages.extractImages')
 external JSPromise<JSString> _extractPdfImages(JSString base64, JSString filename);
 
@@ -246,6 +249,8 @@ class _HomePageState extends State<HomePage> {
           return (await _sqliteStats().toDart).toDart;
         case 'exportDb':
           return (await _sqliteExportDb().toDart).toDart;
+        case 'syncPublishedDb':
+          return (await _sqliteSyncPublishedDb().toDart).toDart;
         case 'importDb':
           if (args.isEmpty || args.first is! String) {
             throw ArgumentError('A base64 SQLite database is required.');
@@ -303,6 +308,25 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (error) {
       if (mounted) setState(() => importStatus = 'Could not share database: $error');
+    } finally {
+      if (mounted) setState(() => uploading = false);
+    }
+  }
+
+  Future<void> syncPublishedDatabase() async {
+    if (uploading) return;
+    setState(() { uploading = true; importStatus = 'Downloading the latest voter database…'; });
+    try {
+      final result = jsonDecode((await _sqliteCall('syncPublishedDb')).toString()) as Map<String, dynamic>;
+      final stats = jsonDecode((await _sqliteCall('stats')).toString()) as Map<String, dynamic>;
+      await _reloadVotersFromDatabase();
+      if (!mounted) return;
+      setState(() {
+        localRecordCount = (stats['records'] as num?)?.toInt() ?? (result['records'] as num?)?.toInt() ?? 0;
+        importStatus = 'Sync complete. $localRecordCount voter records are now up to date.';
+      });
+    } catch (error) {
+      if (mounted) setState(() => importStatus = 'Sync failed. Your current local database was kept. $error');
     } finally {
       if (mounted) setState(() => uploading = false);
     }
@@ -862,6 +886,12 @@ class _HomePageState extends State<HomePage> {
             OutlinedButton.icon(
               onPressed: uploading ? null : importLocalDatabase,
               icon: const Icon(Icons.upload_file), label: const Text('Import .db backup')),
+            FilledButton.icon(
+              onPressed: uploading ? null : syncPublishedDatabase,
+              icon: uploading
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.sync_rounded),
+              label: const Text('Sync latest database')),
           ]),
         ]),
       ),
