@@ -11,6 +11,9 @@ external JSPromise<JSString> _sqliteInit();
 @JS('gagwanaSqlite.stats')
 external JSPromise<JSString> _sqliteStats();
 
+@JS('gagwanaSqlite.saveParsedVoters')
+external JSPromise<JSString> _sqliteSaveParsedVoters(JSString recordsJson);
+
 @JS('gagwanaSqlite.exportDb')
 external JSPromise<JSBoolean> _sqliteExportDb();
 
@@ -215,6 +218,59 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  String _fieldValue(String text, List<String> labels) {
+    final labelPattern = labels.map(RegExp.escape).join('|');
+    final nextLabels = r'(?:नाम|पिता का नाम|पति का नाम|लिंग|आयु|मकान संख्या|घर संख्या)';
+    final pattern = RegExp('(?:$labelPattern)\\s*[:：-]\\s*(.*?)(?=\\s*(?:$nextLabels)\\s*[:：-]|\\n|$)', multiLine: true, dotAll: true);
+    final match = pattern.firstMatch(text);
+    return match?.group(1)?.trim().replaceAll(RegExp(r'\\s+'), ' ') ?? '';
+  }
+
+  List<Map<String, dynamic>> _recordsFromScannedBatches() {
+    final output = <Map<String, dynamic>>[];
+    for (final batch in scannedBatches) {
+      final filename = (batch['filename'] ?? '').toString();
+      final wardMatch = RegExp(r'ward\\s*(?:no[.-]?)?\\s*0*(\\d+)', caseSensitive: false).firstMatch(filename);
+      final ward = wardMatch?.group(1)?.padLeft(2, '0') ?? '';
+      for (final pageValue in (batch['pages'] as List? ?? const [])) {
+        if (pageValue is! Map) continue;
+        final page = pageValue;
+        final pageNo = (page['page'] as num?)?.toInt() ?? 0;
+        for (final chunkValue in (page['chunks'] as List? ?? const [])) {
+          if (chunkValue is! Map || chunkValue['valid_voter_candidate'] != true) continue;
+          final chunk = chunkValue;
+          final id = (chunk['voter_id_candidate'] ?? '').toString().trim();
+          final rawText = (chunk['raw_text'] ?? chunk['text'] ?? '').toString();
+          if (id.isEmpty) continue;
+          final serialMatch = RegExp(r'(?:^|\\s)(E?\\s*\\d{1,4})(?:\\s|$)', multiLine: true).firstMatch(rawText);
+          final father = _fieldValue(rawText, ['पिता का नाम']);
+          final husband = _fieldValue(rawText, ['पति का नाम']);
+          final gender = _fieldValue(rawText, ['लिंग']);
+          final ageText = _fieldValue(rawText, ['आयु', 'उम्र']);
+          final ageMatch = RegExp(r'\\d{1,3}').firstMatch(ageText);
+          output.add({
+            'voter_id': id,
+            'serial_number': serialMatch?.group(1)?.replaceAll(RegExp(r'\\s+'), '') ?? '',
+            'ward': ward,
+            'name': _fieldValue(rawText, ['नाम']),
+            'relative_name': father.isNotEmpty ? father : husband,
+            'relation_type': father.isNotEmpty ? 'father' : (husband.isNotEmpty ? 'husband' : ''),
+            'house_no': _fieldValue(rawText, ['मकान संख्या', 'घर संख्या']),
+            'age': ageMatch == null ? null : int.tryParse(ageMatch.group(0)!),
+            'gender': gender,
+            'is_deleted': false,
+            'deleted_evidence': '',
+            'source_pdf': filename,
+            'source_page': pageNo,
+            'review_required': true,
+            'raw_text': rawText,
+          });
+        }
+      }
+    }
+    return output;
+  }
+
   Future<void> scanSelectedPdfs() async {
     if (selectedPdfs.isEmpty || uploading) return;
     setState(() {
@@ -248,10 +304,23 @@ class _HomePageState extends State<HomePage> {
       final reviewPages = scannedBatches.fold<int>(0, (sum, batch) =>
         sum + ((batch['pages'] as List? ?? const []).where((page) =>
           page is Map && page['grid_detection_failed'] == true).length));
-      setState(() => importStatus =
-        'Parallel Hindi OCR complete: $pages page(s), $chunks grid chunks, $validChunks valid voter candidates. '
-        '$images embedded photo(s) extracted. $reviewPages page(s) used full-page OCR because the grid was not confidently detected. '
-        'Review uncertain names and DELETED stamps; this scan does not save voter records yet.');
+      if (!databaseReady) {
+        await _sqliteCall('init');
+        databaseReady = true;
+      }
+      final parsedRecords = _recordsFromScannedBatches();
+      final saveResult = jsonDecode(
+        (await _sqliteSaveParsedVoters(jsonEncode(parsedRecords).toJS).toDart).toDart
+      ) as Map<String, dynamic>;
+      final saved = (saveResult['saved'] as num?)?.toInt() ?? 0;
+      final total = (saveResult['total'] as num?)?.toInt() ?? 0;
+      setState(() {
+        localRecordCount = total;
+        importStatus =
+          'Parallel Hindi OCR complete: $pages page(s), $chunks grid chunks, $validChunks valid voter candidates. '
+          '$images embedded photo(s) extracted. Saved $saved candidate record(s) to local SQLite; all imported candidates are marked for review. '
+          '$reviewPages page(s) used full-page OCR because the grid was not confidently detected. Verify names, relationship fields and DELETED marks before treating records as final.';
+      });
     } catch (error) {
       if (mounted) setState(() => importStatus = 'PDF image extraction failed: $error');
     } finally {
