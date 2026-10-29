@@ -41,18 +41,16 @@
     }
     return ocrWorkerPromise;
   }
-  async function ocrPage(page) {
-    // OCR the rendered page image rather than trusting embedded PDF font mappings.
-    // Moderate scale keeps voter-roll scans readable without excessive memory use.
-    const viewport = page.getViewport({ scale: 1.35 });
+  async function ocrPageWithWorker(page, worker) {
+    const viewport = page.getViewport({ scale: 1.2 });
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('Could not create a canvas for OCR.');
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvasContext: ctx, viewport }).promise;
-    const worker = await getOcrWorker();
     const result = await worker.recognize(canvas);
     const text = result.data.text || '';
     const words = (result.data.words || []).map(word => ({
@@ -63,10 +61,8 @@
       x1: word.bbox && word.bbox.x1 || 0,
       y1: word.bbox && word.bbox.y1 || 0,
     }));
-    // A page-level stamp is only a review signal; never mark every voter on
-    // that page as deleted. The record parser must confirm overlap per voter.
     const deletedStampCandidates = words.filter(word =>
-      /^(deleted|delet?ed|delete|डिलीटेड)$/i.test(word.text.replace(/[^a-zA-Zअ-ह़-ॿ]/g, '')) &&
+      /^(deleted|delet?ed|delete)$/i.test(word.text.replace(/[^a-zA-Z]/g, '')) &&
       word.confidence >= 20);
     return { text, words, deleted_stamp_candidates: deletedStampCandidates };
   }
@@ -134,8 +130,14 @@
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const pdf = await pdfjs.getDocument({ data: bytes }).promise;
     const pages = [];
-    let totalImages = 0;
+    let worker = null;
     try {
+      // OCR is the priority. Do not extract every embedded face image here:
+      // that can block for seconds per unresolved PDF.js image object.
+      worker = await Promise.race([
+        getOcrWorker(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Hindi OCR engine took too long to start. Reload and retry; check the network connection.')), 45000))
+      ]);
       for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
         await new Promise(resolve => setTimeout(resolve, 0));
         const page = await pdf.getPage(pageNo);
@@ -143,31 +145,14 @@
         const embeddedText = textContent.items.map(item => item.str || '').join(' ').replace(/\\s+/g, ' ').trim();
         let ocr = { text: '', words: [], deleted_stamp_candidates: [], error: null };
         try {
-          ocr = await ocrPage(page);
+          ocr = await Promise.race([
+            ocrPageWithWorker(page, worker),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timed out on page ' + pageNo)), 30000))
+          ]);
         } catch (error) {
           ocr.error = String(error && error.message || error);
         }
         const text = ocr.text || embeddedText;
-        const ops = await page.getOperatorList();
-        const imageIds = [];
-        const seen = new Set();
-        for (let i = 0; i < ops.fnArray.length; i++) {
-          const op = ops.fnArray[i], args = ops.argsArray[i];
-          if ((op === pdfjs.OPS.paintImageXObject || op === pdfjs.OPS.paintImageMaskXObject) &&
-              args && typeof args[0] === 'string' && !seen.has(args[0])) {
-            seen.add(args[0]);
-            imageIds.push(args[0]);
-          } else if (op === pdfjs.OPS.paintInlineImageXObject && args && args[0]) {
-            const url = imageObjectToDataUrl(args[0]);
-            if (url) imageIds.push({ inline: url });
-          }
-        }
-        const images = [];
-        for (const entry of imageIds) {
-          const dataUrl = typeof entry === 'string' ? await getImage(page, entry) : entry.inline;
-          if (dataUrl) images.push({ index: images.length + 1, data_url: dataUrl });
-        }
-        totalImages += images.length;
         pages.push({
           page: pageNo,
           text,
@@ -176,7 +161,7 @@
           ocr_words: ocr.words,
           deleted_stamp_candidates: ocr.deleted_stamp_candidates,
           ocr_error: ocr.error || null,
-          images
+          images: []
         });
       }
     } finally {
@@ -185,7 +170,7 @@
         ocrWorkerPromise = null;
       }
     }
-    return JSON.stringify({ filename, page_count: pdf.numPages, image_count: totalImages, pages });
+    return JSON.stringify({ filename, page_count: pdf.numPages, image_count: 0, pages });
   }
   window.gagwanaPdfImages = { extractImages };
 })();
