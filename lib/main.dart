@@ -11,6 +11,9 @@ external JSPromise<JSString> _sqliteInit();
 @JS('gagwanaSqlite.stats')
 external JSPromise<JSString> _sqliteStats();
 
+@JS('gagwanaSqlite.listVoters')
+external JSPromise<JSString> _sqliteListVoters();
+
 @JS('gagwanaSqlite.saveParsedVoters')
 external JSPromise<JSString> _sqliteSaveParsedVoters(JSString recordsJson);
 
@@ -102,8 +105,48 @@ class _HomePageState extends State<HomePage> {
   int localRecordCount = 0;
   String importStatus = '';
   final List<Map<String, dynamic>> scannedBatches = [];
+  List<Voter> databaseVoters = [];
 
-  List<Voter> get filtered => records.where((v) {
+  @override
+  void initState() {
+    super.initState();
+    _autoConnectDatabase();
+  }
+
+  Future<void> _autoConnectDatabase() async {
+    try {
+      await _sqliteCall('init');
+      await _reloadVotersFromDatabase();
+    } catch (error) {
+      if (mounted) setState(() => importStatus = 'Local database connection failed: $error');
+    }
+  }
+
+  Future<void> _reloadVotersFromDatabase() async {
+    final rows = jsonDecode((await _sqliteListVoters().toDart).toDart) as List<dynamic>;
+    final loaded = rows.whereType<Map<String, dynamic>>().map((row) {
+      final deleted = row['is_deleted'] == true;
+      final review = row['review_required'] == true;
+      final serialText = (row['serial_number'] ?? '').toString().replaceFirst(RegExp(r'^[Ee]'), '');
+      final serial = int.tryParse(serialText) ?? 0;
+      final age = (row['age'] as num?)?.toInt() ?? 0;
+      return Voter(
+        (row['voter_id'] ?? '').toString(), serial, (row['ward'] ?? '').toString(),
+        (row['name'] ?? '').toString(), (row['relative_name'] ?? '').toString(), age,
+        deleted ? Status.deleted : (review ? Status.flagged : Status.active),
+        pdf: (row['source_pdf'] ?? '').toString(),
+        page: (row['source_page'] as num?)?.toInt() ?? 0,
+      );
+    }).toList();
+    if (!mounted) return;
+    setState(() {
+      databaseVoters = loaded;
+      databaseReady = true;
+      localRecordCount = loaded.length;
+    });
+  }
+
+  List<Voter> get filtered => databaseVoters.where((v) {
     final q = search.text.trim().toLowerCase();
     final textMatch = q.isEmpty || v.id.toLowerCase().contains(q) ||
       v.name.toLowerCase().contains(q) || v.relative.toLowerCase().contains(q) ||
@@ -176,6 +219,7 @@ class _HomePageState extends State<HomePage> {
         localRecordCount = (stats['records'] as num?)?.toInt() ?? 0;
         importStatus = 'Local SQLite is ready. $localRecordCount voter record(s) stored in this browser.';
       });
+      await _reloadVotersFromDatabase();
     } catch (error) {
       if (!mounted) return;
       setState(() => importStatus = 'Could not open local SQLite: $error');
@@ -233,6 +277,9 @@ class _HomePageState extends State<HomePage> {
         databaseReady = true;
         localRecordCount = (stats['records'] as num?)?.toInt() ?? 0;
         importStatus = 'Imported SQLite backup. $localRecordCount voter record(s) are available in this browser.';
+      });
+      await _reloadVotersFromDatabase();
+      if (mounted) setState(() { importStatus = 'Imported SQLite backup. $localRecordCount voter record(s) are available in this browser.';
       });
     } catch (error) {
       if (mounted) setState(() => importStatus = 'Could not import SQLite backup: $error');
@@ -337,6 +384,7 @@ class _HomePageState extends State<HomePage> {
       ) as Map<String, dynamic>;
       final saved = (saveResult['saved'] as num?)?.toInt() ?? 0;
       final total = (saveResult['total'] as num?)?.toInt() ?? 0;
+      await _reloadVotersFromDatabase();
       setState(() {
         localRecordCount = total;
         importStatus =
