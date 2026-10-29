@@ -291,7 +291,7 @@ class _HomePageState extends State<HomePage> {
   String _fieldValue(String text, List<String> labels) {
     final labelPattern = labels.map(RegExp.escape).join('|');
     final nextLabels = r'(?:नाम|पिता का नाम|पति का नाम|लिंग|आयु|मकान संख्या|घर संख्या)';
-    final pattern = RegExp('(?:$labelPattern)\\s*[:：-]\\s*(.*?)(?=\\s*(?:$nextLabels)\\s*[:：-]|\\n|\\x24)', multiLine: true, dotAll: true);
+    final pattern = RegExp('(?:$labelPattern)\\s*[:：-]\\s*(.*?)(?=\\s*(?:$nextLabels)\\s*[:：-]|\\n|\$)', multiLine: true, dotAll: true);
     final match = pattern.firstMatch(text);
     return match?.group(1)?.trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
   }
