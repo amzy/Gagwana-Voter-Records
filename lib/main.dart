@@ -241,8 +241,12 @@ class _HomePageState extends State<HomePage> {
         0, (sum, batch) => sum + ((batch['page_count'] as num?)?.toInt() ?? 0));
       final images = scannedBatches.fold<int>(
         0, (sum, batch) => sum + ((batch['image_count'] as num?)?.toInt() ?? 0));
+      final chunks = scannedBatches.fold<int>(
+        0, (sum, batch) => sum + ((batch['chunk_count'] as num?)?.toInt() ?? 0));
+      final validChunks = scannedBatches.fold<int>(
+        0, (sum, batch) => sum + ((batch['valid_voter_chunk_count'] as num?)?.toInt() ?? 0));
       setState(() => importStatus =
-        'Hindi OCR complete: $pages page(s), $images embedded image(s). OCR text is shown for review and original PDF text is preserved separately. Possible DELETED stamps are review signals only; per-voter row parsing and photo matching still require confirmation before saving.');
+        'Parallel Hindi OCR complete: $pages page(s), $chunks grid chunks, $validChunks valid voter candidates. $images embedded photo(s) extracted. Review uncertain names and DELETED stamps; this scan does not save voter records yet.');
     } catch (error) {
       if (mounted) setState(() => importStatus = 'PDF image extraction failed: $error');
     } finally {
