@@ -1124,42 +1124,95 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           Container(color: (dark ? Colors.black : Colors.white).withValues(alpha: .06)),
+          // A dark gradient gives the identity text a consistent readable surface
+          // without hiding the monument artwork.
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Colors.black.withValues(alpha: .72),
+                    Colors.black.withValues(alpha: .48),
+                    Colors.black.withValues(alpha: .08),
+                    Colors.transparent,
+                  ],
+                  stops: const [0, .42, .72, 1],
+                ),
+              ),
+            ),
+          ),
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
               padding: const EdgeInsets.only(left: 16, top: 22, bottom: 22),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: Container(
-                  width: 104,
-                  height: 124,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .9),
-                    border: Border.all(color: Colors.white, width: 4),
-                    borderRadius: BorderRadius.circular(22),
-                  ),
+                borderRadius: BorderRadius.circular(17),
+                child: SizedBox(
+                  width: 96,
+                  height: 116,
                   child: v.hasPhoto
                     ? FutureBuilder<Uint8List?>(
                         future: _photoFutures.putIfAbsent(v.id, () => _loadVoterPhoto(v.id)),
                         builder: (context, snapshot) {
                           final bytes = snapshot.data;
-                          if (bytes != null && bytes.isNotEmpty) return Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true);
-                          return Center(child: Text(initial, style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: theme.colorScheme.primary)));
+                          if (bytes != null && bytes.isNotEmpty) {
+                            return Image.memory(
+                              bytes,
+                              fit: BoxFit.cover,
+                              gaplessPlayback: true,
+                              errorBuilder: (_, __, ___) => _avatarInitial(initial, theme),
+                            );
+                          }
+                          return _avatarInitial(initial, theme);
                         },
                       )
-                    : Center(child: Text(initial, style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: theme.colorScheme.primary))),
+                    : _avatarInitial(initial, theme),
                 ),
               ),
             ),
           ),
-          Positioned(left: 134, right: 12, top: 66, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(v.name.isEmpty ? 'नाम उपलब्ध नहीं' : v.name, maxLines: 2, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Color(0xFF153C2E), shadows: [Shadow(color: Colors.white70, blurRadius: 8)])),
-            const SizedBox(height: 4),
-            const Text('पिता / पति का नाम', style: TextStyle(fontSize: 12, color: Color(0xFF344B5B), fontWeight: FontWeight.w600)),
-            Text(v.relative.isEmpty ? 'उपलब्ध नहीं' : v.relative, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 15, color: Color(0xFF172D25), fontWeight: FontWeight.w800)),
-          ])),
+          Positioned(
+            left: 126,
+            right: 14,
+            top: 43,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  v.name.isEmpty ? 'नाम उपलब्ध नहीं' : v.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    height: 1.2,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    shadows: [Shadow(color: Colors.black87, blurRadius: 8)],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'पिता / पति का नाम',
+                  style: TextStyle(fontSize: 12, color: Color(0xFFE4ECF7), fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  v.relative.isEmpty ? 'उपलब्ध नहीं' : v.relative,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    shadows: [Shadow(color: Colors.black87, blurRadius: 7)],
+                  ),
+                ),
+              ],
+            ),
+          ),
           Positioned(left: 132, right: 10, bottom: 12, child: Wrap(spacing: 5, runSpacing: 5, children: [
             _heroPill(Icons.home_rounded, 'वार्ड ${wardLabel(v.ward)}'),
             _heroPill(Icons.tag_rounded, '${v.serial}'),
@@ -1174,6 +1227,21 @@ class _HomePageState extends State<HomePage> {
     final number = int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), ''));
     return number == null ? value : number.toString().padLeft(2, '0');
   }
+
+  Widget _avatarInitial(String initial, ThemeData theme) => Container(
+    color: theme.brightness == Brightness.dark
+        ? const Color(0xFF24364D)
+        : const Color(0xFFE4ECF7),
+    alignment: Alignment.center,
+    child: Text(
+      initial,
+      style: TextStyle(
+        fontSize: 46,
+        fontWeight: FontWeight.w900,
+        color: theme.colorScheme.primary,
+      ),
+    ),
+  );
 
   Widget _heroPill(IconData icon, String label) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
@@ -1221,17 +1289,58 @@ class _HomePageState extends State<HomePage> {
     child: Column(children: rows),
   );
 
-  Widget _detailDataRow(IconData icon, String label, String value, {bool copy = false}) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 11),
-    child: Row(children: [
-      Container(width: 34, height: 34, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: .55), borderRadius: BorderRadius.circular(10)),
-        child: Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary)),
-      const SizedBox(width: 10),
-      SizedBox(width: 112, child: Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600))),
-      Expanded(child: Text(value.isEmpty ? '—' : value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
-      if (copy) IconButton(visualDensity: VisualDensity.compact, onPressed: () => Clipboard.setData(ClipboardData(text: value)), icon: const Icon(Icons.copy_rounded, size: 17)),
-    ]),
-  );
+  Widget _detailDataRow(IconData icon, String label, String value, {bool copy = false}) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: dark ? .22 : .10),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, size: 18, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 124,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: dark ? const Color(0xFFB8C6D9) : const Color(0xFF536277),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value.isEmpty ? '—' : value,
+              softWrap: true,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                height: 1.3,
+                color: dark ? const Color(0xFFF4F7FC) : const Color(0xFF17253A),
+              ),
+            ),
+          ),
+          if (copy)
+            IconButton(
+              tooltip: 'Copy voter ID',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => Clipboard.setData(ClipboardData(text: value)),
+              icon: Icon(Icons.copy_rounded, size: 18, color: theme.colorScheme.onSurfaceVariant),
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _detailPhotoPlaceholder(Voter v) {
     final theme = Theme.of(context);
