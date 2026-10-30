@@ -728,8 +728,29 @@ class _HomePageState extends State<HomePage> {
                 Wrap(spacing: 7, runSpacing: 6, children: [
                   _recordMeta(Icons.person_outline_rounded, v.age > 0 ? '${v.age} वर्ष' : 'आयु —'),
                   _recordMeta(Icons.location_on_rounded, 'वार्ड ${wardLabel(v.ward)}'),
-                  _recordMeta(Icons.numbers_rounded, 'क्र. संख्या ${v.serial}'),
                 ]),
+                const SizedBox(height: 7),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: dark ? .22 : .09),
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: .28)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.numbers_rounded, size: 15, color: theme.colorScheme.primary),
+                      const SizedBox(width: 5),
+                      Text('क्र. संख्या', style: theme.textTheme.labelSmall?.copyWith(
+                        color: muted, fontWeight: FontWeight.w700)),
+                      const SizedBox(width: 5),
+                      Text(v.serial > 0 ? '${v.serial}' : '—',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.primary, fontWeight: FontWeight.w900)),
+                    ],
+                  ),
+                ),
               ]),
             ),
             const SizedBox(width: 4),
