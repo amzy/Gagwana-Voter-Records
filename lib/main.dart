@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+@JS('window.open')
+external JSAny? _openExternalUrl(JSString url, JSString target);
+
 @JS('gagwanaSqlite.init')
 external JSPromise<JSString> _sqliteInit();
 
@@ -139,6 +142,75 @@ const records = <Voter>[
   Voter('RJ/15/555/666777',126,'02','गीता देवी','रामलाल',33,Status.active),
   Voter('RJ/15/888/999000',127,'08','पवन कुमार','हनुमान प्रसाद',48,Status.flagged),
 ];
+
+class AboutUsScreen extends StatelessWidget {
+  const AboutUsScreen({super.key});
+
+  static const String portfolioUrl = 'https://amzy.github.io/portfolio/';
+
+  void _openPortfolio() {
+    _openExternalUrl(portfolioUrl.toJS, '_blank'.toJS);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('About us', style: TextStyle(fontWeight: FontWeight.w800)),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(22),
+        children: [
+          const SizedBox(height: 24),
+          Center(
+            child: Container(
+              width: 88, height: 88,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF626B),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [BoxShadow(color: const Color(0xFFFF626B).withValues(alpha: .22), blurRadius: 24, offset: const Offset(0, 10))],
+              ),
+              child: const Icon(Icons.groups_rounded, color: Colors.white, size: 48),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text('गगवाना', textAlign: TextAlign.center,
+            style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text('Gagwana Voter Records', textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 26),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('About us', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 10),
+                Text(
+                  'Gagwana Voter Records helps users browse and search voter records by name, voter ID, serial number and ward. It includes ward-wise browsing, record details and a locally stored database that can be synchronised with the published database.',
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
+                ),
+                const SizedBox(height: 18),
+                FilledButton.icon(
+                  onPressed: _openPortfolio,
+                  icon: const Icon(Icons.open_in_new_rounded),
+                  label: const Text('Visit portfolio'),
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                ),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text('Portfolio: $portfolioUrl', textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          if (dark) const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.dark, required this.onTheme});
@@ -616,6 +688,13 @@ class _HomePageState extends State<HomePage> {
             Text('गगवाना', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, height: 1.1)),
             Text('मतदाता सूची • Gagwana Voter Records', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ])),
+          IconButton(
+            tooltip: 'About us',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => const AboutUsScreen(),
+            )),
+            icon: const Icon(Icons.info_outline_rounded),
+          ),
           IconButton.filledTonal(
             tooltip: dark ? 'Light mode' : 'Dark mode',
             onPressed: () => widget.onTheme(!dark),
