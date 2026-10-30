@@ -684,16 +684,28 @@ class _HomePageState extends State<HomePage> {
             child: const Icon(Icons.groups_rounded, color: Colors.white, size: 27),
           ),
           const SizedBox(width: 11),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('गगवाना', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, height: 1.1)),
-            Text('मतदाता सूची • Gagwana Voter Records', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          ])),
-          IconButton(
-            tooltip: 'About us',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => const AboutUsScreen(),
-            )),
-            icon: const Icon(Icons.info_outline_rounded),
+          Expanded(
+            child: Text(
+              'गगवाना',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, height: 1.1),
+            ),
+          ),
+          const SizedBox(width: 4),
+          SizedBox(
+            width: 44,
+            height: 44,
+            child: IconButton(
+              tooltip: 'About us',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+              onPressed: () => _openExternalUrl(
+                'https://amzy.github.io/portfolio/'.toJS,
+                '_blank'.toJS,
+              ),
+              icon: const Icon(Icons.info_outline_rounded, size: 25),
+            ),
           ),
           IconButton.filledTonal(
             tooltip: dark ? 'Light mode' : 'Dark mode',
