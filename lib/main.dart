@@ -393,7 +393,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> syncPublishedDatabase() async {
     if (uploading) return;
-    setState(() { uploading = true; importStatus = 'Downloading the latest voter database…'; });
+    setState(() { uploading = true; importStatus = 'Downloading the latest compressed voter database (.gz)…'; });
     try {
       final result = jsonDecode((await _sqliteCall('syncPublishedDb')).toString()) as Map<String, dynamic>;
       final stats = jsonDecode((await _sqliteCall('stats')).toString()) as Map<String, dynamic>;
@@ -401,10 +401,10 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       setState(() {
         localRecordCount = (stats['records'] as num?)?.toInt() ?? (result['records'] as num?)?.toInt() ?? 0;
-        importStatus = 'Sync complete. $localRecordCount voter records are now up to date.';
+        importStatus = 'Sync from .gz complete. $localRecordCount voter records are now up to date.';
       });
     } catch (error) {
-      if (mounted) setState(() => importStatus = 'Sync failed. Your current local database was kept. $error');
+      if (mounted) setState(() => importStatus = 'Sync from .gz failed. Your current local database was kept. $error');
     } finally {
       if (mounted) setState(() => uploading = false);
     }
@@ -767,6 +767,22 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(width: 9),
           Expanded(child: _homeStat('डेटाबेस', databaseReady ? 'तैयार' : 'लोड…', Icons.storage_rounded, const Color(0xFF269A9A), dark)),
         ]),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonalIcon(
+            onPressed: uploading ? null : syncPublishedDatabase,
+            icon: uploading
+                ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.sync_rounded),
+            label: const Text('Sync from .gz'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 11),
         const SizedBox(height: 25),
         Row(children: [
           Expanded(child: Text('वार्ड के अनुसार खोजें', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900))),
@@ -1641,7 +1657,7 @@ class _HomePageState extends State<HomePage> {
               icon: uploading
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.sync_rounded),
-              label: const Text('Sync latest database')),
+              label: const Text('Sync from .gz')),
           ]),
         ]),
       ),
