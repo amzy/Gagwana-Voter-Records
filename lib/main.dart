@@ -788,49 +788,108 @@ class _HomePageState extends State<HomePage> {
           TextButton(onPressed: () => setState(() { ward = 'All wards'; status = 'All records'; }), child: const Text('सभी वार्ड')),
         ]),
         const SizedBox(height: 3),
-        Text('हर वार्ड की अपनी पहचान और रंग', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        Text('किसी वार्ड को चुनकर उसके मतदाता रिकॉर्ड देखें', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         const SizedBox(height: 12),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: 13,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.82,
+            crossAxisCount: 2,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.9,
           ),
           itemBuilder: (context, index) {
             final number = index + 1;
             final label = number.toString().padLeft(2, '0');
             final selected = ward == label || ward == number.toString();
-            return InkWell(
-              borderRadius: BorderRadius.circular(17),
-              onTap: () => setState(() { ward = selected ? 'All wards' : label; }),
-              child: Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(17),
-                  border: Border.all(color: selected ? theme.colorScheme.primary : theme.dividerColor.withValues(alpha: .35), width: selected ? 2 : 1),
-                ),
-                child: Stack(fit: StackFit.expand, children: [
-                  Image.asset(
-                    'assets/ward_themes/ward_${label}.png',
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: Icon(Icons.image_not_supported_outlined, color: theme.colorScheme.onSurfaceVariant),
+            final cardColor = selected
+                ? theme.colorScheme.primaryContainer
+                : theme.colorScheme.surfaceContainerLow;
+            final foregroundColor = selected
+                ? theme.colorScheme.onPrimaryContainer
+                : theme.colorScheme.onSurface;
+            return Material(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => setState(() {
+                  ward = selected ? 'All wards' : label;
+                }),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: selected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outlineVariant.withValues(alpha: .55),
+                      width: selected ? 1.8 : 1,
                     ),
                   ),
-                  Container(color: (dark ? Colors.black : Colors.white).withValues(alpha: .18)),
-                  Positioned(left: 10, bottom: 8, right: 8, child: Row(children: [
-                    Expanded(child: Text('वार्ड $label', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF173D36), shadows: [Shadow(color: Colors.white, blurRadius: 7)]))),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: .9), borderRadius: BorderRadius.circular(20)),
-                      child: Text('${wardCounts[index]} रिकॉर्ड', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF173D36))),
-                    ),
-                  ])),
-                  if (selected) const Positioned(right: 8, top: 8, child: Icon(Icons.check_circle, color: Color(0xFF0878F9), size: 22)),
-                ]),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          label,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: selected
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.onSecondaryContainer,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'वार्ड $label',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: foregroundColor,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${wardCounts[index]} रिकॉर्ड',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        selected ? Icons.check_circle_rounded : Icons.chevron_right_rounded,
+                        size: 19,
+                        color: selected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             );
           },
