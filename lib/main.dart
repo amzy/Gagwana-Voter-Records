@@ -814,7 +814,7 @@ class _HomePageState extends State<HomePage> {
     var selectedSection = 0;
     final wardNumber = int.tryParse(v.ward.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
     final wardIndex = wardNumber.clamp(1, 13);
-    final themePath = 'assets/ward_themes/ward_${wardIndex.toString().padLeft(2, '0')}.svg';
+    final themePath = "assets/ward_themes/ward_${wardIndex.toString().padLeft(2, '0')}.svg";
     final sections = const ['विवरण', 'पता', 'दस्तावेज', 'नोट्स'];
     return StatefulBuilder(
       builder: (sheetContext, setSheetState) => SafeArea(
