@@ -494,7 +494,17 @@ class _HomePageState extends State<HomePage> {
           constraints: const BoxConstraints(maxWidth: 1100),
           child: IndexedStack(
             index: tab,
-            children: [searchScreen(), importScreen()],
+            children: [
+              RefreshIndicator(
+                onRefresh: syncPublishedDatabase,
+                color: Theme.of(context).colorScheme.primary,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                displacement: 54,
+                edgeOffset: 8,
+                child: searchScreen(),
+              ),
+              importScreen(),
+            ],
           ),
         ))),
       ]),
