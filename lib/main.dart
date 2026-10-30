@@ -1105,9 +1105,6 @@ class _HomePageState extends State<HomePage> {
 
   Widget detailSheet(Voter v) {
     var selectedSection = 0;
-    final wardNumber = int.tryParse(v.ward.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
-    final wardIndex = wardNumber.clamp(1, 13);
-    final themePath = "assets/ward_themes/ward_${wardIndex.toString().padLeft(2, '0')}.png";
     final sections = const ['विवरण', 'पता', 'दस्तावेज', 'नोट्स'];
     return StatefulBuilder(
       builder: (sheetContext, setSheetState) => SafeArea(
@@ -1126,7 +1123,7 @@ class _HomePageState extends State<HomePage> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
                   children: [
-                    _voterHeroCard(v, themePath, sheetContext),
+                    _voterHeroCard(v, sheetContext),
                     if (v.hasPhoto) ...[
                       const SizedBox(height: 8),
                       Align(
@@ -1180,125 +1177,275 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _voterHeroCard(Voter v, String themePath, BuildContext context) {
+  Widget _voterHeroCard(Voter v, BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final initial = v.name.trim().isEmpty ? '•' : v.name.trim().substring(0, 1);
-    // Standard CR80 PVC card proportion: 85.60 x 53.98 mm.
-    // AspectRatio keeps the card landscape and responsive across screen sizes.
+    final cardText = dark ? const Color(0xFFF4F7FC) : const Color(0xFF142B4A);
+    final mutedText = dark ? const Color(0xFFB8C8DC) : const Color(0xFF536985);
+    final cardSurface = dark ? const Color(0xFF142235) : const Color(0xFFF7FAFF);
+
+    // Corporate PVC-inspired profile card. This is an in-app information
+    // presentation, not an official identity document.
     return AspectRatio(
       aspectRatio: 85.60 / 53.98,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Stack(fit: StackFit.expand, children: [
-          Image.asset(
-            themePath,
-            fit: BoxFit.cover,
-            filterQuality: FilterQuality.high,
-            errorBuilder: (context, error, stackTrace) => Container(
-              color: theme.colorScheme.surfaceContainerHighest,
-              child: Icon(Icons.image_not_supported_outlined, color: theme.colorScheme.onSurfaceVariant),
-            ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardSurface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: dark ? const Color(0xFF344A66) : const Color(0xFFD7E3F3),
           ),
-          Container(color: (dark ? Colors.black : Colors.white).withValues(alpha: .06)),
-          // A dark gradient gives the identity text a consistent readable surface
-          // without hiding the monument artwork.
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Colors.black.withValues(alpha: .72),
-                    Colors.black.withValues(alpha: .48),
-                    Colors.black.withValues(alpha: .08),
-                    Colors.transparent,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: dark ? .22 : .08),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 58,
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Color(0xFF073B78), Color(0xFF1267B8), Color(0xFF2788D8)],
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      right: -22,
+                      top: -58,
+                      child: Container(
+                        width: 190,
+                        height: 130,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: .08),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                Text(
+                                  'मतदाता प्रोफाइल',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.05,
+                                  ),
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  'VOTER PROFILE',
+                                  style: TextStyle(
+                                    color: Color(0xFFD8EAFE),
+                                    fontSize: 9,
+                                    letterSpacing: 1.35,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: .16),
+                              border: Border.all(color: Colors.white.withValues(alpha: .28)),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.location_on_rounded, color: Colors.white, size: 13),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'WARD ${wardLabel(v.ward)}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: .4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
-                  stops: const [0, .42, .72, 1],
                 ),
               ),
             ),
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 16, top: 22, bottom: 22),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(17),
-                child: SizedBox(
-                  width: 96,
-                  height: 116,
-                  child: v.hasPhoto
-                    ? FutureBuilder<Uint8List?>(
-                        future: _photoFutures.putIfAbsent(v.id, () => _loadVoterPhoto(v.id)),
-                        builder: (context, snapshot) {
-                          final bytes = snapshot.data;
-                          if (bytes != null && bytes.isNotEmpty) {
-                            return Image.memory(
-                              bytes,
-                              fit: BoxFit.cover,
-                              gaplessPlayback: true,
-                              errorBuilder: (_, __, ___) => _avatarInitial(initial, theme),
-                            );
-                          }
-                          return _avatarInitial(initial, theme);
-                        },
-                      )
-                    : _avatarInitial(initial, theme),
-                ),
+            Positioned(
+              top: 70,
+              left: 14,
+              bottom: 12,
+              width: 88,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox.expand(
+                        child: v.hasPhoto
+                            ? FutureBuilder<Uint8List?>(
+                                future: _photoFutures.putIfAbsent(v.id, () => _loadVoterPhoto(v.id)),
+                                builder: (context, snapshot) {
+                                  final bytes = snapshot.data;
+                                  if (bytes != null && bytes.isNotEmpty) {
+                                    return Image.memory(
+                                      bytes,
+                                      fit: BoxFit.cover,
+                                      gaplessPlayback: true,
+                                      errorBuilder: (_, __, ___) => _avatarInitial(initial, theme),
+                                    );
+                                  }
+                                  return _avatarInitial(initial, theme);
+                                },
+                              )
+                            : _avatarInitial(initial, theme),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 3),
+                    decoration: BoxDecoration(
+                      color: dark ? const Color(0xFF203B5B) : const Color(0xFFE4F0FF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      v.age > 0 ? '${v.age} वर्ष' : 'आयु —',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      style: TextStyle(color: dark ? Colors.white : const Color(0xFF174A85), fontSize: 10, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          Positioned(
-            left: 126,
-            right: 14,
-            top: 43,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  v.name.isEmpty ? 'नाम उपलब्ध नहीं' : v.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    height: 1.2,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    shadows: [Shadow(color: Colors.black87, blurRadius: 8)],
+            Positioned(
+              top: 72,
+              left: 114,
+              right: 12,
+              bottom: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          v.name.isEmpty ? 'नाम उपलब्ध नहीं' : v.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: cardText,
+                            fontSize: 19,
+                            height: 1.15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(child: Align(alignment: Alignment.topRight, child: badge(v.status))),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'पिता / पति का नाम',
-                  style: TextStyle(fontSize: 12, color: Color(0xFFE4ECF7), fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  v.relative.isEmpty ? 'उपलब्ध नहीं' : v.relative,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    shadows: [Shadow(color: Colors.black87, blurRadius: 7)],
+                  const SizedBox(height: 5),
+                  Text(
+                    'पिता / पति का नाम',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: mutedText, fontSize: 10, fontWeight: FontWeight.w700),
                   ),
-                ),
-              ],
+                  Text(
+                    v.relative.trim().isEmpty ? 'उपलब्ध नहीं' : v.relative,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: cardText, fontSize: 13, fontWeight: FontWeight.w800),
+                  ),
+                  const Spacer(),
+                  Container(height: 1, color: dark ? const Color(0xFF344A66) : const Color(0xFFDCE6F2)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _corporateMeta(
+                          Icons.credit_card_rounded,
+                          'VOTER ID',
+                          v.id,
+                          cardText,
+                          mutedText,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _corporateMeta(
+                        Icons.tag_rounded,
+                        'क्रम संख्या',
+                        '${v.serial}',
+                        cardText,
+                        mutedText,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          Positioned(left: 132, right: 10, bottom: 12, child: Wrap(spacing: 5, runSpacing: 5, children: [
-            _heroPill(Icons.home_rounded, 'वार्ड ${wardLabel(v.ward)}'),
-            _heroPill(Icons.tag_rounded, '${v.serial}'),
-            if (v.age > 0) _heroPill(Icons.cake_rounded, '${v.age} वर्ष'),
-          ])),
-        ]),
+          ],
+        ),
       ),
     );
   }
+
+  Widget _corporateMeta(
+    IconData icon,
+    String label,
+    String value,
+    Color valueColor,
+    Color labelColor,
+  ) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 13, color: const Color(0xFF287AC4)),
+      const SizedBox(width: 4),
+      Flexible(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 8, color: labelColor, fontWeight: FontWeight.w700)),
+            Text(value.isEmpty ? '—' : value, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: valueColor, fontWeight: FontWeight.w900)),
+          ],
+        ),
+      ),
+    ],
+  );
 
   String wardLabel(String value) {
     final number = int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), ''));
