@@ -589,71 +589,198 @@ class _HomePageState extends State<HomePage> {
 
   Widget searchScreen() {
     final theme = Theme.of(context);
-    final activeFilters = (ward != 'All wards' ? 1 : 0) + (status != 'All records' ? 1 : 0);
+    final dark = theme.brightness == Brightness.dark;
+    final total = databaseVoters.length;
+    final activeCount = databaseVoters.where((v) => v.status == Status.active).length;
+    final flaggedCount = databaseVoters.where((v) => v.status == Status.flagged).length;
+    final deletedCount = databaseVoters.where((v) => v.status == Status.deleted).length;
+    final wardCounts = List<int>.generate(13, (i) => databaseVoters.where((v) {
+      final n = int.tryParse(v.ward.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      return n == i + 1;
+    }).length);
+    final showingResults = search.text.trim().isNotEmpty || ward != 'All wards' || status != 'All records';
+    final shown = filtered;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 30),
       children: [
-        Text('Find a voter', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.7)),
-        const SizedBox(height: 6),
-        Text('Search names, voter IDs and serial numbers', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 22),
-        TextField(
-          controller: search,
-          onChanged: (_) => setState(() {}),
-          textInputAction: TextInputAction.search,
-          decoration: InputDecoration(
-            hintText: 'Name, voter ID or serial number',
-            prefixIcon: const Icon(Icons.search_rounded),
-            suffixIcon: search.text.isEmpty ? null : IconButton(
-              tooltip: 'Clear search',
-              onPressed: () { search.clear(); setState(() {}); },
-              icon: const Icon(Icons.close_rounded)),
-            filled: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-          ),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: _showFilters,
-          icon: const Icon(Icons.tune_rounded),
-          label: Text(activeFilters == 0 ? 'Filters' : 'Filters · $activeFilters active'),
-          style: OutlinedButton.styleFrom(
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Search results', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 3),
-            Text(activeFilters == 0 ? 'All wards · All statuses' : '${ward == 'All wards' ? 'All wards' : 'Ward $ward'} · $status',
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          ])),
+        Row(children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(30)),
-            child: Text('${filtered.length}', style: TextStyle(fontWeight: FontWeight.w800, color: theme.colorScheme.onSecondaryContainer)),
+            width: 46, height: 46,
+            decoration: BoxDecoration(color: const Color(0xFFFF626B), borderRadius: BorderRadius.circular(16)),
+            child: const Icon(Icons.groups_rounded, color: Colors.white, size: 27),
+          ),
+          const SizedBox(width: 11),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('गगवाना', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, height: 1.1)),
+            Text('मतदाता सूची • Gagwana Voter Records', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ])),
+          IconButton.filledTonal(
+            tooltip: dark ? 'Light mode' : 'Dark mode',
+            onPressed: () => widget.onTheme(!dark),
+            icon: Icon(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
           ),
         ]),
-        const SizedBox(height: 12),
-        if (filtered.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
-              child: Column(children: [
-                Icon(Icons.person_search_rounded, size: 42, color: theme.colorScheme.onSurfaceVariant),
-                const SizedBox(height: 12),
-                Text('No voters found', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text('Try another name or adjust your filters.', textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-              ]),
+        const SizedBox(height: 22),
+        Container(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(26),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+              colors: dark ? const [Color(0xFF173B58), Color(0xFF172A43), Color(0xFF253B55)] : const [Color(0xFFE2F4E2), Color(0xFFD9EDFF), Color(0xFFF7EEDB)],
             ),
           ),
-        ...filtered.map(recordCard),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('अपनी मतदाता सूची खोजें', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, color: dark ? Colors.white : const Color(0xFF173D36))),
+            const SizedBox(height: 5),
+            Text('Search voters by name, voter ID or serial number', style: theme.textTheme.bodySmall?.copyWith(color: dark ? Colors.white70 : const Color(0xFF405B62))),
+            const SizedBox(height: 16),
+            TextField(
+              controller: search,
+              onChanged: (_) => setState(() {}),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'नाम, पिता/पति का नाम या Voter ID',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: search.text.isEmpty ? null : IconButton(
+                  onPressed: () { search.clear(); setState(() {}); },
+                  icon: const Icon(Icons.close_rounded),
+                ),
+                filled: true,
+                fillColor: dark ? const Color(0xFF0C1B2B) : Colors.white,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(17), borderSide: BorderSide.none),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(17), borderSide: BorderSide.none),
+              ),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 18),
+        Row(children: [
+          Expanded(child: _homeStat('कुल रिकॉर्ड', total.toString(), Icons.people_alt_rounded, const Color(0xFF3978E8), dark)),
+          const SizedBox(width: 9),
+          Expanded(child: _homeStat('सक्रिय', activeCount.toString(), Icons.check_circle_rounded, const Color(0xFF16A765), dark)),
+          const SizedBox(width: 9),
+          Expanded(child: _homeStat('जाँच बाकी', flaggedCount.toString(), Icons.flag_rounded, const Color(0xFFF0A12A), dark)),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: _homeStat('हटाए गए', deletedCount.toString(), Icons.person_off_rounded, const Color(0xFFE35A61), dark)),
+          const SizedBox(width: 9),
+          Expanded(child: _homeStat('वार्ड', '13', Icons.location_on_rounded, const Color(0xFF8B63D9), dark)),
+          const SizedBox(width: 9),
+          Expanded(child: _homeStat('डेटाबेस', databaseReady ? 'तैयार' : 'लोड…', Icons.storage_rounded, const Color(0xFF269A9A), dark)),
+        ]),
+        const SizedBox(height: 25),
+        Row(children: [
+          Expanded(child: Text('वार्ड के अनुसार खोजें', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900))),
+          TextButton(onPressed: () => setState(() { ward = 'All wards'; status = 'All records'; }), child: const Text('सभी वार्ड')),
+        ]),
+        const SizedBox(height: 3),
+        Text('हर वार्ड की अपनी पहचान और रंग', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 13,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.82,
+          ),
+          itemBuilder: (context, index) {
+            final number = index + 1;
+            final label = number.toString().padLeft(2, '0');
+            final selected = ward == label || ward == number.toString();
+            return InkWell(
+              borderRadius: BorderRadius.circular(17),
+              onTap: () => setState(() { ward = selected ? 'All wards' : label; }),
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(17),
+                  border: Border.all(color: selected ? theme.colorScheme.primary : theme.dividerColor.withValues(alpha: .35), width: selected ? 2 : 1),
+                ),
+                child: Stack(fit: StackFit.expand, children: [
+                  SvgPicture.asset('assets/ward_themes/ward_${label}.svg', fit: BoxFit.cover),
+                  Container(color: (dark ? Colors.black : Colors.white).withValues(alpha: .18)),
+                  Positioned(left: 10, bottom: 8, right: 8, child: Row(children: [
+                    Expanded(child: Text('वार्ड $label', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF173D36), shadows: [Shadow(color: Colors.white, blurRadius: 7)]))),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: .9), borderRadius: BorderRadius.circular(20)),
+                      child: Text('${wardCounts[index]} रिकॉर्ड', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF173D36))),
+                    ),
+                  ])),
+                  if (selected) const Positioned(right: 8, top: 8, child: Icon(Icons.check_circle, color: Color(0xFF0878F9), size: 22)),
+                ]),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 24),
+        Row(children: [
+          Expanded(child: Text(showingResults ? 'खोज परिणाम' : 'हाल के रिकॉर्ड', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900))),
+          Text('${shown.length}', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.primary)),
+        ]),
+        const SizedBox(height: 10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            _quickStatusChip('सभी', 'All records', total),
+            const SizedBox(width: 7),
+            _quickStatusChip('सक्रिय', 'Active only', activeCount),
+            const SizedBox(width: 7),
+            _quickStatusChip('जाँच बाकी', 'Flagged only', flaggedCount),
+            const SizedBox(width: 7),
+            _quickStatusChip('हटाए गए', 'Deleted only', deletedCount),
+          ]),
+        ),
+        const SizedBox(height: 13),
+        if (shown.isEmpty)
+          Card(child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+            child: Column(children: [
+              Icon(Icons.person_search_rounded, size: 42, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(height: 10),
+              Text('कोई रिकॉर्ड नहीं मिला', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text('अपनी खोज या वार्ड फ़िल्टर बदलकर देखें', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
+            ]),
+          ))
+        else
+          ...shown.take(showingResults ? shown.length : 12).map(recordCard),
+        if (!showingResults && shown.length > 12)
+          Center(child: TextButton.icon(
+            onPressed: () => setState(() { status = 'All records'; }),
+            icon: const Icon(Icons.expand_more_rounded), label: Text('और ${shown.length - 12} रिकॉर्ड देखें'),
+          )),
       ],
+    );
+  }
+
+  Widget _homeStat(String label, String value, IconData icon, Color color, bool dark) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xFF101F31) : Colors.white,
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: color.withValues(alpha: .18)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(height: 7),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: color)),
+        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      ]),
+    ),
+  );
+
+  Widget _quickStatusChip(String label, String value, int count) {
+    final selected = status == value;
+    return ChoiceChip(
+      selected: selected,
+      onSelected: (_) => setState(() => status = value),
+      label: Text('$label $count'),
+      avatar: selected ? const Icon(Icons.check_rounded, size: 15) : null,
     );
   }
 
