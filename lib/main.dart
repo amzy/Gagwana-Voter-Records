@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 @JS('gagwanaSqlite.init')
 external JSPromise<JSString> _sqliteInit();
@@ -808,58 +809,191 @@ class _HomePageState extends State<HomePage> {
       child: Text(label, style: TextStyle(color:c,fontWeight:FontWeight.w700,fontSize:11)));
   }
 
-  Widget detailSheet(Voter v) => SafeArea(child: Padding(
-    padding: EdgeInsets.fromLTRB(20,8,20,MediaQuery.viewInsetsOf(context).bottom+24),
-    child: SingleChildScrollView(child: Column(crossAxisAlignment:CrossAxisAlignment.start,children: [
-      Text('Voter details', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
-      const SizedBox(height:16),
-      Center(
-        child: ClipOval(
-          child: SizedBox(
-            width: 84,
-            height: 84,
-            child: v.hasPhoto
-                ? FutureBuilder<Uint8List?>(
-                    future: _photoFutures.putIfAbsent(v.id, () => _loadVoterPhoto(v.id)),
-                    builder: (context, snapshot) {
-                      final bytes = snapshot.data;
-                      if (bytes != null && bytes.isNotEmpty) {
-                        return Image.memory(
-                          bytes,
-                          width: 84,
-                          height: 84,
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
-                          errorBuilder: (_, __, ___) => _detailPhotoPlaceholder(v),
-                        );
-                      }
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Container(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          alignment: Alignment.center,
-                          child: const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+  Widget detailSheet(Voter v) {
+    var selectedSection = 0;
+    final wardNumber = int.tryParse(v.ward.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
+    final wardIndex = wardNumber.clamp(1, 13);
+    final themePath = 'assets/ward_themes/ward_${wardIndex.toString().padLeft(2, '0')}.svg';
+    final sections = const ['विवरण', 'पता', 'दस्तावेज', 'नोट्स'];
+    return StatefulBuilder(
+      builder: (sheetContext, setSheetState) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * .92,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+                child: Row(children: [
+                  Expanded(child: Text('मतदाता विवरण', style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
+                  IconButton(tooltip: 'Close', onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close_rounded)),
+                ]),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                  children: [
+                    _voterHeroCard(v, themePath, sheetContext),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(sheetContext).brightness == Brightness.dark ? const Color(0xFF142235) : const Color(0xFFEAF1FB),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(children: List.generate(sections.length, (index) => Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => setSheetState(() => selectedSection = index),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: selectedSection == index ? Theme.of(sheetContext).colorScheme.surface : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: selectedSection == index ? [BoxShadow(color: Colors.black.withValues(alpha: .07), blurRadius: 8, offset: const Offset(0, 2))] : [],
+                            ),
+                            child: Text(sections[index], textAlign: TextAlign.center, style: TextStyle(
+                              fontSize: 12, fontWeight: selectedSection == index ? FontWeight.w800 : FontWeight.w600,
+                              color: selectedSection == index ? Theme.of(sheetContext).colorScheme.primary : Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                            )),
                           ),
-                        );
-                      }
-                      return _detailPhotoPlaceholder(v);
-                    },
-                  )
-                : _detailPhotoPlaceholder(v),
+                        ),
+                      ))),
+                    ),
+                    const SizedBox(height: 12),
+                    if (selectedSection == 0) _detailInfoPanel(v, sheetContext),
+                    if (selectedSection == 1) _detailAddressPanel(v, sheetContext),
+                    if (selectedSection == 2) _detailDocumentsPanel(v, sheetContext),
+                    if (selectedSection == 3) _detailNotesPanel(v, sheetContext),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
-      const SizedBox(height:10),
-      Center(child: Text(v.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold))),
-      const SizedBox(height:14),
-      detailRow('Voter ID',v.id), detailRow('Serial number','${v.serial}'), detailRow('Ward',v.ward),
-      detailRow('Name',v.name), detailRow('Relative name',v.relative), detailRow('Age','${v.age}'),
-      detailRow('Status',v.status == Status.active ? 'Active' : v.status == Status.flagged ? 'Flagged — review required' : 'Deleted — explicit PDF mark'),
-      detailRow('Source','${v.pdf}, page ${v.page}'),
-    ])),
-  ));
+    );
+  }
+
+  Widget _voterHeroCard(Voter v, String themePath, BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final initial = v.name.trim().isEmpty ? '•' : v.name.trim().substring(0, 1);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: SizedBox(
+        height: 224,
+        child: Stack(fit: StackFit.expand, children: [
+          SvgPicture.asset(themePath, fit: BoxFit.cover),
+          Container(color: (dark ? Colors.black : Colors.white).withValues(alpha: .06)),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16, top: 22, bottom: 22),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: Container(
+                  width: 104,
+                  height: 124,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .9),
+                    border: Border.all(color: Colors.white, width: 4),
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: v.hasPhoto
+                    ? FutureBuilder<Uint8List?>(
+                        future: _photoFutures.putIfAbsent(v.id, () => _loadVoterPhoto(v.id)),
+                        builder: (context, snapshot) {
+                          final bytes = snapshot.data;
+                          if (bytes != null && bytes.isNotEmpty) return Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true);
+                          return Center(child: Text(initial, style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: theme.colorScheme.primary)));
+                        },
+                      )
+                    : Center(child: Text(initial, style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: theme.colorScheme.primary))),
+                ),
+              ),
+            ),
+          ),
+          Positioned(left: 134, right: 12, top: 66, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(v.name.isEmpty ? 'नाम उपलब्ध नहीं' : v.name, maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Color(0xFF153C2E), shadows: [Shadow(color: Colors.white70, blurRadius: 8)])),
+            const SizedBox(height: 4),
+            const Text('पिता / पति का नाम', style: TextStyle(fontSize: 12, color: Color(0xFF344B5B), fontWeight: FontWeight.w600)),
+            Text(v.relative.isEmpty ? 'उपलब्ध नहीं' : v.relative, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 15, color: Color(0xFF172D25), fontWeight: FontWeight.w800)),
+          ])),
+          Positioned(left: 132, right: 10, bottom: 12, child: Wrap(spacing: 5, runSpacing: 5, children: [
+            _heroPill(Icons.home_rounded, 'वार्ड ${wardLabel(v.ward)}'),
+            _heroPill(Icons.tag_rounded, '${v.serial}'),
+            if (v.age > 0) _heroPill(Icons.cake_rounded, '${v.age} वर्ष'),
+          ])),
+        ]),
+      ),
+    );
+  }
+
+  String wardLabel(String value) {
+    final number = int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), ''));
+    return number == null ? value : number.toString().padLeft(2, '0');
+  }
+
+  Widget _heroPill(IconData icon, String label) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+    decoration: BoxDecoration(color: Colors.white.withValues(alpha: .88), borderRadius: BorderRadius.circular(20)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: const Color(0xFF174A40)),
+      const SizedBox(width: 4),
+      Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF173C35))),
+    ]),
+  );
+
+  Widget _detailInfoPanel(Voter v, BuildContext context) => _detailPanel(context, [
+    _detailDataRow(Icons.badge_outlined, 'मतदाता ID', v.id, copy: true),
+    _detailDataRow(Icons.person_outline, 'नाम', v.name),
+    _detailDataRow(Icons.groups_2_outlined, 'पिता / पति का नाम', v.relative),
+    _detailDataRow(Icons.cake_outlined, 'आयु', v.age > 0 ? '${v.age} वर्ष' : '—'),
+    _detailDataRow(Icons.location_on_outlined, 'वार्ड', wardLabel(v.ward)),
+    _detailDataRow(Icons.numbers_rounded, 'क्रम संख्या', '${v.serial}'),
+    _detailDataRow(Icons.verified_outlined, 'स्थिति', v.status == Status.active ? 'सक्रिय' : v.status == Status.flagged ? 'सत्यापन आवश्यक' : 'हटाया गया'),
+  ]);
+
+  Widget _detailAddressPanel(Voter v, BuildContext context) => _detailPanel(context, [
+    _detailDataRow(Icons.home_outlined, 'पता', 'गगवाना, वार्ड ${wardLabel(v.ward)}'),
+    _detailDataRow(Icons.location_city_outlined, 'शहर / जिला', 'अजमेर'),
+    _detailDataRow(Icons.map_outlined, 'राज्य', 'राजस्थान'),
+  ]);
+
+  Widget _detailDocumentsPanel(Voter v, BuildContext context) => _detailPanel(context, [
+    _detailDataRow(Icons.picture_as_pdf_outlined, 'मूल दस्तावेज', v.pdf),
+    _detailDataRow(Icons.description_outlined, 'PDF पृष्ठ', '${v.page}'),
+    _detailDataRow(Icons.image_outlined, 'फोटो', v.hasPhoto ? 'उपलब्ध' : 'उपलब्ध नहीं'),
+  ]);
+
+  Widget _detailNotesPanel(Voter v, BuildContext context) => _detailPanel(context, [
+    _detailDataRow(Icons.flag_outlined, 'समीक्षा स्थिति', v.status == Status.flagged ? 'इस रिकॉर्ड की जाँच आवश्यक है' : 'कोई अतिरिक्त नोट नहीं'),
+  ]);
+
+  Widget _detailPanel(BuildContext context, List<Widget> rows) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: .35)),
+    ),
+    child: Column(children: rows),
+  );
+
+  Widget _detailDataRow(IconData icon, String label, String value, {bool copy = false}) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 11),
+    child: Row(children: [
+      Container(width: 34, height: 34, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: .55), borderRadius: BorderRadius.circular(10)),
+        child: Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary)),
+      const SizedBox(width: 10),
+      SizedBox(width: 112, child: Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600))),
+      Expanded(child: Text(value.isEmpty ? '—' : value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
+      if (copy) IconButton(visualDensity: VisualDensity.compact, onPressed: () => Clipboard.setData(ClipboardData(text: value)), icon: const Icon(Icons.copy_rounded, size: 17)),
+    ]),
+  );
 
   Widget _detailPhotoPlaceholder(Voter v) {
     final theme = Theme.of(context);
