@@ -151,6 +151,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final search = TextEditingController();
   int tab = 0;
+  bool showAllHomeRecords = false;
   String ward = 'All wards', status = 'All records';
   final List<PlatformFile> selectedPdfs = [];
   bool uploading = false;
@@ -481,21 +482,6 @@ class _HomePageState extends State<HomePage> {
     final wide = MediaQuery.sizeOf(context).width >= 850;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      appBar: AppBar(
-        title: const Row(children: [
-          CircleAvatar(backgroundColor: Color(0xFFFF626B), child: Icon(Icons.groups_rounded, color: Colors.white)),
-          SizedBox(width: 10),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Gagwana', style: TextStyle(fontWeight: FontWeight.w800)),
-            Text('Voter Records', style: TextStyle(fontSize: 12)),
-          ]),
-        ]),
-        actions: [IconButton(
-          tooltip: dark ? 'Light mode' : 'Dark mode',
-          onPressed: () => widget.onTheme(!dark),
-          icon: Icon(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded)),
-          const SizedBox(width: 8)],
-      ),
       body: Row(children: [
         if (wide) NavigationRail(
           selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v),
@@ -747,11 +733,12 @@ class _HomePageState extends State<HomePage> {
             ]),
           ))
         else
-          ...shown.take(showingResults ? shown.length : 12).map(recordCard),
+          ...shown.take(showingResults || showAllHomeRecords ? shown.length : 12).map(recordCard),
         if (!showingResults && shown.length > 12)
           Center(child: TextButton.icon(
-            onPressed: () => setState(() { status = 'All records'; }),
-            icon: const Icon(Icons.expand_more_rounded), label: Text('और ${shown.length - 12} रिकॉर्ड देखें'),
+            onPressed: () => setState(() => showAllHomeRecords = !showAllHomeRecords),
+            icon: Icon(showAllHomeRecords ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+            label: Text(showAllHomeRecords ? 'कम रिकॉर्ड दिखाएँ' : 'और ${shown.length - 12} रिकॉर्ड देखें'),
           )),
       ],
     );
