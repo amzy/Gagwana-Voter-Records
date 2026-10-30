@@ -728,6 +728,7 @@ class _HomePageState extends State<HomePage> {
                 Wrap(spacing: 7, runSpacing: 6, children: [
                   _recordMeta(Icons.person_outline_rounded, v.age > 0 ? '${v.age} वर्ष' : 'आयु —'),
                   _recordMeta(Icons.location_on_rounded, 'वार्ड ${wardLabel(v.ward)}'),
+                  _recordMeta(Icons.numbers_rounded, 'क्र. संख्या ${v.serial}'),
                 ]),
               ]),
             ),
