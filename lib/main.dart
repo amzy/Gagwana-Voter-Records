@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 @JS('window.open')
 external JSAny? _openExternalUrl(JSString url, JSString target);
@@ -793,7 +792,15 @@ class _HomePageState extends State<HomePage> {
                   border: Border.all(color: selected ? theme.colorScheme.primary : theme.dividerColor.withValues(alpha: .35), width: selected ? 2 : 1),
                 ),
                 child: Stack(fit: StackFit.expand, children: [
-                  SvgPicture.asset('assets/ward_themes/ward_${label}.svg', fit: BoxFit.cover),
+                  Image.asset(
+                    'assets/ward_themes/ward_${label}.png',
+                    fit: BoxFit.cover,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      child: Icon(Icons.image_not_supported_outlined, color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
                   Container(color: (dark ? Colors.black : Colors.white).withValues(alpha: .18)),
                   Positioned(left: 10, bottom: 8, right: 8, child: Row(children: [
                     Expanded(child: Text('वार्ड $label', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF173D36), shadows: [Shadow(color: Colors.white, blurRadius: 7)]))),
@@ -1036,7 +1043,7 @@ class _HomePageState extends State<HomePage> {
     var selectedSection = 0;
     final wardNumber = int.tryParse(v.ward.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
     final wardIndex = wardNumber.clamp(1, 13);
-    final themePath = "assets/ward_themes/ward_${wardIndex.toString().padLeft(2, '0')}.svg";
+    final themePath = "assets/ward_themes/ward_${wardIndex.toString().padLeft(2, '0')}.png";
     final sections = const ['विवरण', 'पता', 'दस्तावेज', 'नोट्स'];
     return StatefulBuilder(
       builder: (sheetContext, setSheetState) => SafeArea(
@@ -1107,7 +1114,15 @@ class _HomePageState extends State<HomePage> {
       child: SizedBox(
         height: 224,
         child: Stack(fit: StackFit.expand, children: [
-          SvgPicture.asset(themePath, fit: BoxFit.cover),
+          Image.asset(
+            themePath,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.high,
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: theme.colorScheme.surfaceContainerHighest,
+              child: Icon(Icons.image_not_supported_outlined, color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
           Container(color: (dark ? Colors.black : Colors.white).withValues(alpha: .06)),
           Align(
             alignment: Alignment.centerLeft,
