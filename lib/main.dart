@@ -1184,242 +1184,173 @@ class _HomePageState extends State<HomePage> {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final initial = v.name.trim().isEmpty ? '•' : v.name.trim().substring(0, 1);
-    final cardText = dark ? const Color(0xFFF4F7FC) : const Color(0xFF142B4A);
-    final mutedText = dark ? const Color(0xFFB8C8DC) : const Color(0xFF536985);
-    final cardSurface = dark ? const Color(0xFF142235) : const Color(0xFFF7FAFF);
+    final foreground = dark ? const Color(0xFFF4F7FC) : const Color(0xFF142B4A);
+    final muted = dark ? const Color(0xFFB8C8DC) : const Color(0xFF536985);
+    final surface = dark ? const Color(0xFF0D1B2B) : const Color(0xFFF7FAFF);
+    final border = dark ? const Color(0xFF17609A) : const Color(0xFFD7E3F3);
 
-    // Corporate PVC-inspired profile card. This is an in-app information
-    // presentation, not an official identity document.
-    return AspectRatio(
-      aspectRatio: 85.60 / 53.98,
-      child: Container(
-        decoration: BoxDecoration(
-          color: cardSurface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: dark ? const Color(0xFF344A66) : const Color(0xFFD7E3F3),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: dark ? .22 : .08),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+    Widget metric(IconData icon, String label, String value, Color accent) =>
+        Expanded(
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 58),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: dark ? .13 : .08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: accent.withValues(alpha: .22)),
             ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 58,
-              child: DecoratedBox(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [Color(0xFF073B78), Color(0xFF1267B8), Color(0xFF2788D8)],
+            child: Row(
+              children: [
+                Icon(icon, color: accent, size: 19),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: muted, fontSize: 9, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(value.isEmpty ? '—' : value, maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: foreground, fontSize: 12, fontWeight: FontWeight.w900)),
+                    ],
                   ),
                 ),
-                child: Stack(
+              ],
+            ),
+          ),
+        );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: border, width: 1.2),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: dark ? .24 : .08),
+            blurRadius: 18, offset: const Offset(0, 7)),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(15, 13, 13, 13),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [Color(0xFF06468E), Color(0xFF0879D5), Color(0xFF1198E8)],
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .16),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Icon(Icons.groups_rounded, color: Colors.white, size: 25),
+                ),
+                const SizedBox(width: 11),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('गगवाना मतदाता', maxLines: 1,
+                        style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                      SizedBox(height: 2),
+                      Text('VOTER PROFILE', style: TextStyle(
+                        color: Color(0xFFD8EAFE), fontSize: 9,
+                        letterSpacing: 1.4, fontWeight: FontWeight.w800)),
+                    ],
+                  ),
+                ),
+                badge(v.status),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Positioned(
-                      right: -22,
-                      top: -58,
-                      child: Container(
-                        width: 190,
-                        height: 130,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: .08),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
+                    Container(
+                      width: 106, height: 132,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: const Color(0xFF2788D8), width: 1.5),
                       ),
+                      clipBehavior: Clip.antiAlias,
+                      child: v.hasPhoto
+                          ? FutureBuilder<Uint8List?>(
+                              future: _photoFutures.putIfAbsent(v.id, () => _loadVoterPhoto(v.id)),
+                              builder: (context, snapshot) {
+                                final bytes = snapshot.data;
+                                if (bytes != null && bytes.isNotEmpty) {
+                                  return Image.memory(bytes, fit: BoxFit.cover,
+                                    gaplessPlayback: true,
+                                    errorBuilder: (_, __, ___) => _avatarInitial(initial, theme));
+                                }
+                                return _avatarInitial(initial, theme);
+                              },
+                            )
+                          : _avatarInitial(initial, theme),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      child: Row(
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: const [
-                                Text(
-                                  'मतदाता प्रोफाइल',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                    height: 1.05,
-                                  ),
-                                ),
-                                SizedBox(height: 3),
-                                Text(
-                                  'VOTER PROFILE',
-                                  style: TextStyle(
-                                    color: Color(0xFFD8EAFE),
-                                    fontSize: 9,
-                                    letterSpacing: 1.35,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          Text(v.name.isEmpty ? 'नाम उपलब्ध नहीं' : v.name,
+                            maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: foreground, fontSize: 21,
+                              height: 1.15, fontWeight: FontWeight.w900)),
+                          const SizedBox(height: 13),
+                          Text('पिता / पति का नाम',
+                            style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 3),
+                          Text(v.relative.trim().isEmpty ? 'उपलब्ध नहीं' : v.relative,
+                            maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: foreground, fontSize: 15, fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 13),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .16),
-                              border: Border.all(color: Colors.white.withValues(alpha: .28)),
-                              borderRadius: BorderRadius.circular(30),
+                              color: const Color(0xFF0879D5).withValues(alpha: .13),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.location_on_rounded, color: Colors.white, size: 13),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'WARD ${wardLabel(v.ward)}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: .4,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.cake_rounded, color: Color(0xFF2798FF), size: 17),
+                              const SizedBox(width: 6),
+                              Text(v.age > 0 ? '${v.age} वर्ष' : 'आयु —',
+                                style: TextStyle(color: foreground, fontWeight: FontWeight.w800, fontSize: 12)),
+                            ]),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 13),
+                Row(
+                  children: [
+                    metric(Icons.numbers_rounded, 'क्र. संख्या', '${v.serial}', const Color(0xFF3B9BFF)),
+                    const SizedBox(width: 7),
+                    metric(Icons.location_on_rounded, 'वार्ड संख्या', wardLabel(v.ward), const Color(0xFF10BFA0)),
+                    const SizedBox(width: 7),
+                    metric(Icons.badge_rounded, 'मतदाता ID', v.id, const Color(0xFF7C9EFF)),
+                  ],
+                ),
+              ],
             ),
-            Positioned(
-              top: 70,
-              left: 14,
-              bottom: 12,
-              width: 88,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox.expand(
-                        child: v.hasPhoto
-                            ? FutureBuilder<Uint8List?>(
-                                future: _photoFutures.putIfAbsent(v.id, () => _loadVoterPhoto(v.id)),
-                                builder: (context, snapshot) {
-                                  final bytes = snapshot.data;
-                                  if (bytes != null && bytes.isNotEmpty) {
-                                    return Image.memory(
-                                      bytes,
-                                      fit: BoxFit.cover,
-                                      gaplessPlayback: true,
-                                      errorBuilder: (_, __, ___) => _avatarInitial(initial, theme),
-                                    );
-                                  }
-                                  return _avatarInitial(initial, theme);
-                                },
-                              )
-                            : _avatarInitial(initial, theme),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 3),
-                    decoration: BoxDecoration(
-                      color: dark ? const Color(0xFF203B5B) : const Color(0xFFE4F0FF),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      v.age > 0 ? '${v.age} वर्ष' : 'आयु —',
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      style: TextStyle(color: dark ? Colors.white : const Color(0xFF174A85), fontSize: 10, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              top: 72,
-              left: 114,
-              right: 12,
-              bottom: 12,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          v.name.isEmpty ? 'नाम उपलब्ध नहीं' : v.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: cardText,
-                            fontSize: 19,
-                            height: 1.15,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      Flexible(child: Align(alignment: Alignment.topRight, child: badge(v.status))),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'पिता / पति का नाम',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: mutedText, fontSize: 10, fontWeight: FontWeight.w700),
-                  ),
-                  Text(
-                    v.relative.trim().isEmpty ? 'उपलब्ध नहीं' : v.relative,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: cardText, fontSize: 13, fontWeight: FontWeight.w800),
-                  ),
-                  const Spacer(),
-                  Container(height: 1, color: dark ? const Color(0xFF344A66) : const Color(0xFFDCE6F2)),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _corporateMeta(
-                          Icons.credit_card_rounded,
-                          'VOTER ID',
-                          v.id,
-                          cardText,
-                          mutedText,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _corporateMeta(
-                        Icons.tag_rounded,
-                        'क्रम संख्या',
-                        '${v.serial}',
-                        cardText,
-                        mutedText,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1485,8 +1416,8 @@ class _HomePageState extends State<HomePage> {
     _detailDataRow(Icons.person_outline, 'नाम', v.name),
     _detailDataRow(Icons.groups_2_outlined, 'पिता / पति का नाम', v.relative),
     _detailDataRow(Icons.cake_outlined, 'आयु', v.age > 0 ? '${v.age} वर्ष' : '—'),
-    _detailDataRow(Icons.location_on_outlined, 'वार्ड', wardLabel(v.ward)),
-    _detailDataRow(Icons.numbers_rounded, 'क्रम संख्या', '${v.serial}'),
+    _detailDataRow(Icons.numbers_rounded, 'क्र. संख्या', '${v.serial}'),
+    _detailDataRow(Icons.location_on_outlined, 'वार्ड संख्या', wardLabel(v.ward)),
     _detailDataRow(Icons.verified_outlined, 'स्थिति', v.status == Status.active ? 'सक्रिय' : v.status == Status.flagged ? 'सत्यापन आवश्यक' : 'हटाया गया'),
   ]);
 
