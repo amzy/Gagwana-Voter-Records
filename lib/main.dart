@@ -596,7 +596,13 @@ class _HomePageState extends State<HomePage> {
     }).length);
     final showingResults = search.text.trim().isNotEmpty || ward != 'All wards' || status != 'All records';
     final shown = filtered;
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: syncPublishedDatabase,
+      color: theme.colorScheme.primary,
+      backgroundColor: theme.colorScheme.surface,
+      displacement: 48,
+      child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 30),
       children: [
         Row(children: [
@@ -751,6 +757,7 @@ class _HomePageState extends State<HomePage> {
             label: Text(showAllHomeRecords ? 'कम रिकॉर्ड दिखाएँ' : 'और ${shown.length - 12} रिकॉर्ड देखें'),
           )),
       ],
+      ),
     );
   }
 
