@@ -21,6 +21,9 @@ external JSPromise<JSString> _sqliteListVoters();
 @JS('gagwanaSqlite.getPhotoBlob')
 external JSPromise<JSString> _sqliteGetPhotoBlob(JSString voterId);
 
+@JS('gagwanaSqlite.getOriginalPhotoBlob')
+external JSPromise<JSString> _sqliteGetOriginalPhotoBlob(JSString voterId);
+
 @JS('gagwanaSqlite.saveParsedVoters')
 external JSPromise<JSString> _sqliteSaveParsedVoters(JSString recordsJson);
 
@@ -232,6 +235,7 @@ class _HomePageState extends State<HomePage> {
   final List<Map<String, dynamic>> scannedBatches = [];
   List<Voter> databaseVoters = [];
   final Map<String, Future<Uint8List?>> _photoFutures = {};
+  final Map<String, Future<Uint8List?>> _originalPhotoFutures = {};
 
   @override
   void initState() {
@@ -1006,6 +1010,66 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<Uint8List?> _loadOriginalVoterPhoto(String voterId) async {
+    try {
+      final encoded = (await _sqliteGetOriginalPhotoBlob(voterId.toJS).toDart).toDart;
+      if (encoded.isEmpty) return null;
+      return base64Decode(encoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _showOriginalPhoto(Voter voter, BuildContext context) async {
+    final bytes = await _originalPhotoFutures.putIfAbsent(
+      voter.id,
+      () => _loadOriginalVoterPhoto(voter.id),
+    );
+    if (!context.mounted || bytes == null || bytes.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('मूल फोटो', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.pop(dialogContext),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 5,
+                child: Image.memory(
+                  bytes,
+                  fit: BoxFit.contain,
+                  gaplessPlayback: true,
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('मूल स्कैन • ज़ूम करने के लिए पिंच करें'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _photoPlaceholder(String initial, ThemeData theme, bool dark) => Container(
     color: dark ? const Color(0xFF18304D) : const Color(0xFFEAF2FF),
     alignment: Alignment.center,
@@ -1063,7 +1127,18 @@ class _HomePageState extends State<HomePage> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
                   children: [
                     _voterHeroCard(v, themePath, sheetContext),
-                    const SizedBox(height: 14),
+                    if (v.hasPhoto) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () => _showOriginalPhoto(v, sheetContext),
+                          icon: const Icon(Icons.photo_outlined, size: 18),
+                          label: const Text('मूल फोटो देखें'),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
