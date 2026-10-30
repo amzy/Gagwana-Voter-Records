@@ -679,57 +679,74 @@ class _HomePageState extends State<HomePage> {
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 30),
       children: [
-        Row(children: [
-          Container(
-            width: 46, height: 46,
-            decoration: BoxDecoration(color: const Color(0xFFFF626B), borderRadius: BorderRadius.circular(16)),
-            child: const Icon(Icons.groups_rounded, color: Colors.white, size: 27),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Text(
-              'गगवाना',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, height: 1.1),
-            ),
-          ),
-          const SizedBox(width: 4),
-          SizedBox(
-            width: 44,
-            height: 44,
-            child: IconButton(
-              tooltip: 'About us',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints.tightFor(width: 44, height: 44),
-              onPressed: () => _openExternalUrl(
-                'https://amzy.github.io/portfolio/'.toJS,
-                '_blank'.toJS,
-              ),
-              icon: const Icon(Icons.info_outline_rounded, size: 25),
-            ),
-          ),
-          IconButton.filledTonal(
-            tooltip: dark ? 'Light mode' : 'Dark mode',
-            onPressed: () => widget.onTheme(!dark),
-            icon: Icon(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
-          ),
-        ]),
-        const SizedBox(height: 22),
         Container(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          padding: const EdgeInsets.fromLTRB(15, 13, 10, 13),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(26),
+            color: dark ? const Color(0xFF101F31) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: .45)),
+          ),
+          child: Row(children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF0879D5), Color(0xFF06468E)]),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.groups_rounded, color: Colors.white, size: 26),
+            ),
+            const SizedBox(width: 11),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('गगवाना मतदाता', maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, height: 1.1)),
+                const SizedBox(height: 3),
+                Text('VOTER RECORDS • AJMER', style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1.1, fontWeight: FontWeight.w800)),
+              ],
+            )),
+            IconButton(
+              tooltip: 'About us',
+              onPressed: () => _openExternalUrl('https://amzy.github.io/portfolio/'.toJS, '_blank'.toJS),
+              icon: const Icon(Icons.info_outline_rounded),
+            ),
+            IconButton.filledTonal(
+              tooltip: dark ? 'Light mode' : 'Dark mode',
+              onPressed: () => widget.onTheme(!dark),
+              icon: Icon(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 17),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
             gradient: LinearGradient(
               begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: dark ? const [Color(0xFF173B58), Color(0xFF172A43), Color(0xFF253B55)] : const [Color(0xFFE2F4E2), Color(0xFFD9EDFF), Color(0xFFF7EEDB)],
+              colors: dark
+                  ? const [Color(0xFF123D68), Color(0xFF10283F), Color(0xFF101F31)]
+                  : const [Color(0xFFE5F2FF), Color(0xFFF1F7FF), Color(0xFFEAF5F2)],
             ),
+            border: Border.all(color: dark ? const Color(0xFF245783) : const Color(0xFFD5E7F7)),
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('अपनी मतदाता सूची खोजें', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, color: dark ? Colors.white : const Color(0xFF173D36))),
-            const SizedBox(height: 5),
-            Text('Search voters by name, voter ID or serial number', style: theme.textTheme.bodySmall?.copyWith(color: dark ? Colors.white70 : const Color(0xFF405B62))),
-            const SizedBox(height: 16),
+            Row(children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('मतदाता खोजें', style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900, color: dark ? Colors.white : const Color(0xFF153B60))),
+                const SizedBox(height: 4),
+                Text('नाम, मतदाता ID या क्रम संख्या से खोजें',
+                  style: theme.textTheme.bodySmall?.copyWith(color: dark ? const Color(0xFFB8CDE2) : const Color(0xFF536985))),
+              ])),
+              Container(
+                width: 42, height: 42,
+                decoration: BoxDecoration(color: const Color(0xFF0879D5).withValues(alpha: .14), borderRadius: BorderRadius.circular(13)),
+                child: const Icon(Icons.manage_search_rounded, color: Color(0xFF1685DF), size: 25),
+              ),
+            ]),
+            const SizedBox(height: 15),
             TextField(
               controller: search,
               onChanged: (_) => setState(() {}),
@@ -742,10 +759,10 @@ class _HomePageState extends State<HomePage> {
                   icon: const Icon(Icons.close_rounded),
                 ),
                 filled: true,
-                fillColor: dark ? const Color(0xFF0C1B2B) : Colors.white,
+                fillColor: dark ? const Color(0xFF091827) : Colors.white,
                 contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(17), borderSide: BorderSide.none),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(17), borderSide: BorderSide.none),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
               ),
             ),
           ]),
@@ -788,7 +805,7 @@ class _HomePageState extends State<HomePage> {
           TextButton(onPressed: () => setState(() { ward = 'All wards'; status = 'All records'; }), child: const Text('सभी वार्ड')),
         ]),
         const SizedBox(height: 3),
-        Text('किसी वार्ड को चुनकर उसके मतदाता रिकॉर्ड देखें', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        Text('वार्ड चुनें और उसकी मतदाता सूची खोलें', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         const SizedBox(height: 12),
         GridView.builder(
           shrinkWrap: true,
