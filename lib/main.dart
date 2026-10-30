@@ -561,22 +561,15 @@ class _HomePageState extends State<HomePage> {
           selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v),
           labelType: NavigationRailLabelType.all,
           destinations: const [
-            NavigationRailDestination(icon: Icon(Icons.search), label: Text('Search')),
-            NavigationRailDestination(icon: Icon(Icons.picture_as_pdf), label: Text('Import PDFs')),
+            NavigationRailDestination(icon: Icon(Icons.home_rounded), label: Text('Home')),
+            NavigationRailDestination(icon: Icon(Icons.cloud_sync_rounded), label: Text('Sync')),
           ]),
         Expanded(child: Center(child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
           child: IndexedStack(
             index: tab,
             children: [
-              RefreshIndicator(
-                onRefresh: syncPublishedDatabase,
-                color: Theme.of(context).colorScheme.primary,
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                displacement: 54,
-                edgeOffset: 8,
-                child: searchScreen(),
-              ),
+              searchScreen(),
               importScreen(),
             ],
           ),
@@ -585,8 +578,8 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: wide ? null : NavigationBar(
         selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
-          NavigationDestination(icon: Icon(Icons.picture_as_pdf), label: 'Import PDFs'),
+          NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.cloud_sync_rounded), label: 'Sync'),
         ]),
     );
   }
@@ -594,499 +587,85 @@ class _HomePageState extends State<HomePage> {
   Future<void> _showFilters() async {
     var draftWard = ward;
     var draftStatus = status;
+    final theme = Theme.of(context);
     await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      constraints: BoxConstraints(
-        maxWidth: 640,
-        maxHeight: MediaQuery.sizeOf(context).height * .78,
-      ),
+      context: context, isScrollControlled: true, useSafeArea: true,
+      showDragHandle: false, backgroundColor: theme.colorScheme.surface,
+      barrierColor: Colors.black.withValues(alpha: .58),
+      constraints: BoxConstraints(maxWidth: 640, maxHeight: MediaQuery.sizeOf(context).height * .78),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              20, 4, 20, 20 + MediaQuery.viewInsetsOf(context).bottom,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Filter records', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 18),
-                Text('Ward', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 10),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  'All wards', ...List.generate(13, (i) => (i + 1).toString().padLeft(2, '0'))
-                ].map((v) => ChoiceChip(
-                  label: Text(v == 'All wards' ? v : 'Ward $v'),
-                  selected: draftWard == v,
-                  onSelected: (_) => setSheetState(() => draftWard = v),
-                )).toList()),
-                const SizedBox(height: 20),
-                Text('Record status', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 10),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  'All records', 'Active only', 'Flagged only', 'Deleted only'
-                ].map((v) => ChoiceChip(
-                  label: Text(v),
-                  selected: draftStatus == v,
-                  onSelected: (_) => setSheetState(() => draftStatus = v),
-                )).toList()),
-                const SizedBox(height: 22),
-                Row(children: [
-                  Expanded(child: OutlinedButton(
-                    onPressed: () => setSheetState(() { draftWard = 'All wards'; draftStatus = 'All records'; }),
-                    child: const Text('Reset'))),
-                  const SizedBox(width: 12),
-                  Expanded(child: FilledButton(
-                    onPressed: () {
-                      setState(() { ward = draftWard; status = draftStatus; });
-                      Navigator.pop(sheetContext);
-                    },
-                    child: const Text('Show results'))),
-                ]),
-              ],
-            ),
-          ),
-        ),
+        builder: (context, setSheetState) {
+          final t = Theme.of(context);
+          return SafeArea(top: false, child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 18 + MediaQuery.viewInsetsOf(context).bottom),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Center(child: Container(width: 42, height: 5, decoration: BoxDecoration(color: t.colorScheme.onSurfaceVariant.withValues(alpha: .35), borderRadius: BorderRadius.circular(10)))),
+              const SizedBox(height: 20),
+              Row(children: [Expanded(child: Text('फ़िल्टर', style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900))), TextButton(onPressed: () => setSheetState(() { draftWard = 'All wards'; draftStatus = 'All records'; }), child: const Text('रीसेट करें'))]),
+              const SizedBox(height: 18),
+              Text('वार्ड संख्या', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 12),
+              Wrap(spacing: 8, runSpacing: 9, children: ['All wards', ...List.generate(13, (i) => (i + 1).toString().padLeft(2, '0'))].map((value) {
+                final selected = draftWard == value;
+                return ChoiceChip(label: Text(value == 'All wards' ? 'सभी' : value), selected: selected, showCheckmark: false, onSelected: (_) => setSheetState(() => draftWard = value), selectedColor: t.colorScheme.primary, backgroundColor: t.colorScheme.surfaceContainerHighest, labelStyle: TextStyle(color: selected ? t.colorScheme.onPrimary : t.colorScheme.onSurface, fontWeight: FontWeight.w800), shape: StadiumBorder(side: BorderSide(color: t.colorScheme.outlineVariant.withValues(alpha: .55))));
+              }).toList()),
+              const SizedBox(height: 22),
+              Text('रिकॉर्ड की स्थिति', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: [('All records', 'सभी'), ('Active only', 'सक्रिय'), ('Flagged only', 'जाँच बाकी'), ('Deleted only', 'हटाए गए')].map((entry) => ChoiceChip(label: Text(entry.$2), selected: draftStatus == entry.$1, showCheckmark: false, onSelected: (_) => setSheetState(() => draftStatus = entry.$1))).toList()),
+              const SizedBox(height: 24),
+              SizedBox(width: double.infinity, child: FilledButton(onPressed: () { setState(() { ward = draftWard; status = draftStatus; showAllHomeRecords = true; }); Navigator.pop(sheetContext); }, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: const Text('फ़िल्टर लागू करें', style: TextStyle(fontWeight: FontWeight.w800)))),
+            ]),
+          ));
+        },
       ),
     );
   }
-
   Widget searchScreen() {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    final total = databaseVoters.length;
-    final activeCount = databaseVoters.where((v) => v.status == Status.active).length;
-    final flaggedCount = databaseVoters.where((v) => v.status == Status.flagged).length;
-    final deletedCount = databaseVoters.where((v) => v.status == Status.deleted).length;
-    final wardCounts = List<int>.generate(13, (i) => databaseVoters.where((v) {
-      final n = int.tryParse(v.ward.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-      return n == i + 1;
-    }).length);
-    final showingResults = search.text.trim().isNotEmpty || ward != 'All wards' || status != 'All records';
     final shown = filtered;
+    final showingResults = search.text.trim().isNotEmpty || ward != 'All wards' || status != 'All records';
+    final activeFilters = (ward != 'All wards' ? 1 : 0) + (status != 'All records' ? 1 : 0);
     return RefreshIndicator(
-      onRefresh: syncPublishedDatabase,
-      color: theme.colorScheme.primary,
-      backgroundColor: theme.colorScheme.surface,
-      displacement: 48,
+      onRefresh: syncPublishedDatabase, color: theme.colorScheme.primary,
+      backgroundColor: theme.colorScheme.surface, displacement: 42,
       child: ListView(
-      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 30),
-      children: [
-        Container(
-          padding: const EdgeInsets.fromLTRB(15, 13, 10, 13),
-          decoration: BoxDecoration(
-            color: dark ? const Color(0xFF101F31) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: .45)),
-          ),
-          child: Row(children: [
-            Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF0879D5), Color(0xFF06468E)]),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(Icons.groups_rounded, color: Colors.white, size: 26),
-            ),
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+        children: [
+          Row(children: [
+            Container(width: 44, height: 44, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF0879D5), Color(0xFF06468E)]), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.groups_rounded, color: Colors.white, size: 26)),
             const SizedBox(width: 11),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('गगवाना मतदाता', maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, height: 1.1)),
-                const SizedBox(height: 3),
-                Text('VOTER RECORDS • AJMER', style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1.1, fontWeight: FontWeight.w800)),
-              ],
-            )),
-            IconButton(
-              tooltip: 'About us',
-              onPressed: () => _openExternalUrl('https://amzy.github.io/portfolio/'.toJS, '_blank'.toJS),
-              icon: const Icon(Icons.info_outline_rounded),
-            ),
-            IconButton.filledTonal(
-              tooltip: dark ? 'Light mode' : 'Dark mode',
-              onPressed: () => widget.onTheme(!dark),
-              icon: Icon(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
-            ),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('गगवाना मतदाता', maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, height: 1.1)),
+              const SizedBox(height: 3),
+              Text('VOTER RECORDS • AJMER', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1.1, fontWeight: FontWeight.w800)),
+            ])),
+            IconButton(tooltip: 'About us', onPressed: () => _openExternalUrl('https://amzy.github.io/portfolio/'.toJS, '_blank'.toJS), icon: const Icon(Icons.info_outline_rounded)),
+            IconButton.filledTonal(tooltip: dark ? 'Light mode' : 'Dark mode', onPressed: () => widget.onTheme(!dark), icon: Icon(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded)),
           ]),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 17),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: dark
-                  ? const [Color(0xFF123D68), Color(0xFF10283F), Color(0xFF101F31)]
-                  : const [Color(0xFFE5F2FF), Color(0xFFF1F7FF), Color(0xFFEAF5F2)],
-            ),
-            border: Border.all(color: dark ? const Color(0xFF245783) : const Color(0xFFD5E7F7)),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('मतदाता खोजें', style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900, color: dark ? Colors.white : const Color(0xFF153B60))),
-                const SizedBox(height: 4),
-                Text('नाम, मतदाता ID या क्रम संख्या से खोजें',
-                  style: theme.textTheme.bodySmall?.copyWith(color: dark ? const Color(0xFFB8CDE2) : const Color(0xFF536985))),
-              ])),
-              Container(
-                width: 42, height: 42,
-                decoration: BoxDecoration(color: const Color(0xFF0879D5).withValues(alpha: .14), borderRadius: BorderRadius.circular(13)),
-                child: const Icon(Icons.manage_search_rounded, color: Color(0xFF1685DF), size: 25),
-              ),
-            ]),
-            const SizedBox(height: 15),
-            TextField(
-              controller: search,
-              onChanged: (_) => setState(() {}),
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: 'नाम, पिता/पति का नाम या Voter ID',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: search.text.isEmpty ? null : IconButton(
-                  onPressed: () { search.clear(); setState(() {}); },
-                  icon: const Icon(Icons.close_rounded),
-                ),
-                filled: true,
-                fillColor: dark ? const Color(0xFF091827) : Colors.white,
-                contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-              ),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 18),
-        Row(children: [
-          Expanded(child: _homeStat('कुल रिकॉर्ड', total.toString(), Icons.people_alt_rounded, const Color(0xFF3978E8), dark)),
-          const SizedBox(width: 9),
-          Expanded(child: _homeStat('सक्रिय', activeCount.toString(), Icons.check_circle_rounded, const Color(0xFF16A765), dark)),
-          const SizedBox(width: 9),
-          Expanded(child: _homeStat('जाँच बाकी', flaggedCount.toString(), Icons.flag_rounded, const Color(0xFFF0A12A), dark)),
-        ]),
-        const SizedBox(height: 10),
-        Row(children: [
-          Expanded(child: _homeStat('हटाए गए', deletedCount.toString(), Icons.person_off_rounded, const Color(0xFFE35A61), dark)),
-          const SizedBox(width: 9),
-          Expanded(child: _homeStat('वार्ड', '13', Icons.location_on_rounded, const Color(0xFF8B63D9), dark)),
-          const SizedBox(width: 9),
-          Expanded(child: _homeStat('डेटाबेस', databaseReady ? 'तैयार' : 'लोड…', Icons.storage_rounded, const Color(0xFF269A9A), dark)),
-        ]),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.tonalIcon(
-            onPressed: uploading ? null : syncPublishedDatabase,
-            icon: uploading
-                ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.sync_rounded),
-            label: const Text('Sync from .gz'),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            ),
-          ),
-        ),
-        const SizedBox(height: 11),
-        const SizedBox(height: 25),
-        Row(children: [
-          Expanded(child: Text('वार्ड के अनुसार खोजें', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900))),
-          TextButton(onPressed: () => setState(() { ward = 'All wards'; status = 'All records'; }), child: const Text('सभी वार्ड')),
-        ]),
-        const SizedBox(height: 3),
-        Text('वार्ड चुनें और उसकी मतदाता सूची खोलें', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: 13,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.9,
-          ),
-          itemBuilder: (context, index) {
-            final number = index + 1;
-            final label = number.toString().padLeft(2, '0');
-            final selected = ward == label || ward == number.toString();
-            final cardColor = selected
-                ? theme.colorScheme.primaryContainer
-                : theme.colorScheme.surfaceContainerLow;
-            final foregroundColor = selected
-                ? theme.colorScheme.onPrimaryContainer
-                : theme.colorScheme.onSurface;
-            return Material(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => setState(() {
-                  ward = selected ? 'All wards' : label;
-                }),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: selected
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.outlineVariant.withValues(alpha: .55),
-                      width: selected ? 1.8 : 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.secondaryContainer,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          label,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: selected
-                                ? theme.colorScheme.onPrimary
-                                : theme.colorScheme.onSecondaryContainer,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'वार्ड $label',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: foregroundColor,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              '${wardCounts[index]} रिकॉर्ड',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        selected ? Icons.check_circle_rounded : Icons.chevron_right_rounded,
-                        size: 19,
-                        color: selected
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 24),
-        Row(children: [
-          Expanded(child: Text(showingResults ? 'खोज परिणाम' : 'हाल के रिकॉर्ड', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900))),
-          Text('${shown.length}', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.primary)),
-        ]),
-        const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(children: [
-            _quickStatusChip('सभी', 'All records', total),
-            const SizedBox(width: 7),
-            _quickStatusChip('सक्रिय', 'Active only', activeCount),
-            const SizedBox(width: 7),
-            _quickStatusChip('जाँच बाकी', 'Flagged only', flaggedCount),
-            const SizedBox(width: 7),
-            _quickStatusChip('हटाए गए', 'Deleted only', deletedCount),
-          ]),
-        ),
-        const SizedBox(height: 13),
-        if (shown.isEmpty)
-          Card(child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+          const SizedBox(height: 18),
+          Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: dark ? const [Color(0xFF073D78), Color(0xFF092C50), Color(0xFF0C2037)] : const [Color(0xFFE2F1FF), Color(0xFFF2F8FF), Color(0xFFE8F3FF)]), border: Border.all(color: dark ? const Color(0xFF1764A8) : const Color(0xFFD3E6F8))),
             child: Column(children: [
-              Icon(Icons.person_search_rounded, size: 42, color: theme.colorScheme.onSurfaceVariant),
-              const SizedBox(height: 10),
-              Text('कोई रिकॉर्ड नहीं मिला', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 4),
-              Text('अपनी खोज या वार्ड फ़िल्टर बदलकर देखें', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
+              TextField(controller: search, onChanged: (_) => setState(() => showAllHomeRecords = true), textInputAction: TextInputAction.search, decoration: InputDecoration(hintText: 'नाम, पिता / पति का नाम या मतदाता ID खोजें…', prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF1685DF), size: 25), suffixIcon: search.text.isEmpty ? null : IconButton(tooltip: 'खोज साफ़ करें', onPressed: () { search.clear(); setState(() => showAllHomeRecords = false); }, icon: const Icon(Icons.close_rounded)), filled: true, fillColor: dark ? const Color(0xFFF5F8FC) : Colors.white, hintStyle: const TextStyle(color: Color(0xFF7588A2), fontSize: 13), contentPadding: const EdgeInsets.symmetric(vertical: 17), border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)), style: const TextStyle(color: Color(0xFF152A42), fontWeight: FontWeight.w600)),
+              const SizedBox(height: 11),
+              Row(children: [
+                Expanded(child: OutlinedButton.icon(onPressed: _showFilters, icon: const Icon(Icons.location_on_rounded, size: 18), label: Text(ward == 'All wards' ? 'सभी वार्ड' : 'वार्ड $ward', maxLines: 1, overflow: TextOverflow.ellipsis), style: OutlinedButton.styleFrom(foregroundColor: dark ? Colors.white : const Color(0xFF174A85), side: BorderSide(color: dark ? const Color(0xFF47749D) : const Color(0xFFB8D4F0)), minimumSize: const Size(0, 44), shape: const StadiumBorder()))),
+                const SizedBox(width: 9),
+                Expanded(child: OutlinedButton.icon(onPressed: _showFilters, icon: const Icon(Icons.tune_rounded, size: 18), label: Text(activeFilters == 0 ? 'फ़िल्टर' : 'फ़िल्टर ($activeFilters)'), style: OutlinedButton.styleFrom(foregroundColor: dark ? Colors.white : const Color(0xFF174A85), side: BorderSide(color: dark ? const Color(0xFF47749D) : const Color(0xFFB8D4F0)), minimumSize: const Size(0, 44), shape: const StadiumBorder()))),
+              ]),
             ]),
-          ))
-        else
-          ...shown.take(showingResults || showAllHomeRecords ? shown.length : 12).map(recordCard),
-        if (!showingResults && shown.length > 12)
-          Center(child: TextButton.icon(
-            onPressed: () => setState(() => showAllHomeRecords = !showAllHomeRecords),
-            icon: Icon(showAllHomeRecords ? Icons.expand_less_rounded : Icons.expand_more_rounded),
-            label: Text(showAllHomeRecords ? 'कम रिकॉर्ड दिखाएँ' : 'और ${shown.length - 12} रिकॉर्ड देखें'),
-          )),
-      ],
-      ),
-    );
-  }
-
-  Widget _homeStat(String label, String value, IconData icon, Color color, bool dark) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-      decoration: BoxDecoration(
-        color: dark ? const Color(0xFF101F31) : Colors.white,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: color.withValues(alpha: .18)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icon, color: color, size: 18),
-        const SizedBox(height: 7),
-        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: color)),
-        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-      ]),
-    ),
-  );
-
-  Widget _quickStatusChip(String label, String value, int count) {
-    final selected = status == value;
-    return ChoiceChip(
-      selected: selected,
-      onSelected: (_) => setState(() => status = value),
-      label: Text('$label $count'),
-      avatar: selected ? const Icon(Icons.check_rounded, size: 15) : null,
-    );
-  }
-
-  Widget recordCard(Voter v) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final initial = v.name.trim().isEmpty ? '•' : v.name.trim().substring(0, 1);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          showDragHandle: true,
-          useSafeArea: true,
-          builder: (_) => detailSheet(v),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: SizedBox(
-                  width: 54,
-                  height: 60,
-                  child: v.hasPhoto
-                      ? FutureBuilder<Uint8List?>(
-                          future: _photoFutures.putIfAbsent(v.id, () => _loadVoterPhoto(v.id)),
-                          builder: (context, snapshot) {
-                            final bytes = snapshot.data;
-                            if (bytes != null && bytes.isNotEmpty) {
-                              return Image.memory(
-                                bytes,
-                                fit: BoxFit.cover,
-                                gaplessPlayback: true,
-                                errorBuilder: (_, __, ___) => _photoPlaceholder(initial, theme, dark),
-                              );
-                            }
-                            return _photoPlaceholder(initial, theme, dark);
-                          },
-                        )
-                      : _photoPlaceholder(initial, theme, dark),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            v.name.trim().isEmpty ? 'Name unavailable' : v.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              height: 1.2,
-                              letterSpacing: -.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        badge(v.status),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Voter ID  ·  ${v.id}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      v.relative.trim().isEmpty ? 'Relative name unavailable' : v.relative,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 9),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _recordMeta(Icons.location_on_outlined, 'Ward ${v.ward}'),
-                        _recordMeta(Icons.numbers_rounded, 'Serial ${v.serial}'),
-                        _recordMeta(Icons.cake_outlined, v.age > 0 ? 'Age ${v.age}' : 'Age —'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 2),
-              Padding(
-                padding: const EdgeInsets.only(top: 18),
-                child: Icon(Icons.chevron_right_rounded, color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ],
           ),
-        ),
+          const SizedBox(height: 19),
+          Row(children: [Expanded(child: Text(showingResults ? 'खोज परिणाम (${shown.length})' : 'मतदाता सूची (${shown.length})', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900))), if (showingResults) TextButton(onPressed: () => setState(() { search.clear(); ward = 'All wards'; status = 'All records'; showAllHomeRecords = false; }), child: const Text('साफ़ करें'))]),
+          const SizedBox(height: 9),
+          if (shown.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 52, horizontal: 20), child: Column(children: [Icon(Icons.person_search_rounded, size: 48, color: theme.colorScheme.onSurfaceVariant), const SizedBox(height: 12), Text('कोई मतदाता नहीं मिला', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)), const SizedBox(height: 5), Text('नाम, मतदाता ID या वार्ड फ़िल्टर बदलकर फिर कोशिश करें', textAlign: TextAlign.center, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))]))
+          else ...shown.take(showingResults || showAllHomeRecords ? shown.length : 30).map(recordCard),
+          if (!showingResults && shown.length > 30) Center(child: TextButton.icon(onPressed: () => setState(() => showAllHomeRecords = !showAllHomeRecords), icon: Icon(showAllHomeRecords ? Icons.expand_less_rounded : Icons.expand_more_rounded), label: Text(showAllHomeRecords ? 'कम रिकॉर्ड दिखाएँ' : 'और रिकॉर्ड देखें'))),
+          if (uploading) const Padding(padding: EdgeInsets.only(top: 10), child: Center(child: CircularProgressIndicator())),
+        ],
       ),
     );
   }
