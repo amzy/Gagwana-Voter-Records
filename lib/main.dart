@@ -1184,10 +1184,12 @@ class _HomePageState extends State<HomePage> {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final initial = v.name.trim().isEmpty ? '•' : v.name.trim().substring(0, 1);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: SizedBox(
-        height: 224,
+    // Standard CR80 PVC card proportion: 85.60 x 53.98 mm.
+    // AspectRatio keeps the card landscape and responsive across screen sizes.
+    return AspectRatio(
+      aspectRatio: 85.60 / 53.98,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
         child: Stack(fit: StackFit.expand, children: [
           Image.asset(
             themePath,
