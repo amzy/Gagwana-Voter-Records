@@ -670,6 +670,74 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget recordCard(Voter v) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final initial = v.name.trim().isEmpty ? '•' : v.name.trim().substring(0, 1);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xFF101F30) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: dark ? const Color(0xFF1C3852) : const Color(0xFFDCE7F2)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => showModalBottomSheet<void>(
+          context: context, isScrollControlled: true, showDragHandle: true,
+          useSafeArea: true, builder: (_) => detailSheet(v),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(11),
+          child: Row(children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 66, height: 76,
+                child: v.hasPhoto
+                    ? FutureBuilder<Uint8List?>(
+                        future: _photoFutures.putIfAbsent(v.id, () => _loadVoterPhoto(v.id)),
+                        builder: (context, snapshot) {
+                          final bytes = snapshot.data;
+                          if (bytes != null && bytes.isNotEmpty) {
+                            return Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true,
+                              errorBuilder: (_, __, ___) => _photoPlaceholder(initial, theme, dark));
+                          }
+                          return _photoPlaceholder(initial, theme, dark);
+                        },
+                      )
+                    : _photoPlaceholder(initial, theme, dark),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Expanded(child: Text(v.name.trim().isEmpty ? 'नाम उपलब्ध नहीं' : v.name,
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900))),
+                  const SizedBox(width: 5),
+                  badge(v.status),
+                ]),
+                const SizedBox(height: 4),
+                Text(v.relative.trim().isEmpty ? 'पिता / पति: उपलब्ध नहीं' : 'पिता / पति: ${v.relative}',
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: muted, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(spacing: 7, runSpacing: 6, children: [
+                  _recordMeta(Icons.person_outline_rounded, v.age > 0 ? '${v.age} वर्ष' : 'आयु —'),
+                  _recordMeta(Icons.location_on_rounded, 'वार्ड ${wardLabel(v.ward)}'),
+                ]),
+              ]),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, color: muted, size: 24),
+          ]),
+        ),
+      ),
+    );
+  }
   Future<Uint8List?> _loadVoterPhoto(String voterId) async {
     try {
       final encoded = (await _sqliteGetPhotoBlob(voterId.toJS).toDart).toDart;
