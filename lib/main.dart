@@ -224,6 +224,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final search = TextEditingController();
+  final FocusNode searchFocus = FocusNode();
   int tab = 0;
   bool showAllHomeRecords = false;
   String ward = 'All wards', status = 'All records';
@@ -293,6 +294,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     search.dispose();
+    searchFocus.dispose();
     super.dispose();
   }
 
@@ -649,7 +651,7 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 18),
           Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: dark ? const [Color(0xFF073D78), Color(0xFF092C50), Color(0xFF0C2037)] : const [Color(0xFFE2F1FF), Color(0xFFF2F8FF), Color(0xFFE8F3FF)]), border: Border.all(color: dark ? const Color(0xFF1764A8) : const Color(0xFFD3E6F8))),
             child: Column(children: [
-              TextField(controller: search, onChanged: (_) => setState(() => showAllHomeRecords = true), textInputAction: TextInputAction.search, decoration: InputDecoration(hintText: 'नाम, पिता / पति का नाम या मतदाता ID खोजें…', prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF1685DF), size: 25), suffixIcon: search.text.isEmpty ? null : IconButton(tooltip: 'खोज साफ़ करें', onPressed: () { search.clear(); setState(() => showAllHomeRecords = false); }, icon: const Icon(Icons.close_rounded)), filled: true, fillColor: dark ? const Color(0xFFF5F8FC) : Colors.white, hintStyle: const TextStyle(color: Color(0xFF7588A2), fontSize: 13), contentPadding: const EdgeInsets.symmetric(vertical: 17), border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)), style: const TextStyle(color: Color(0xFF152A42), fontWeight: FontWeight.w600)),
+              TextField(controller: search, focusNode: searchFocus, onTap: () => FocusScope.of(context).requestFocus(searchFocus), onChanged: (_) => setState(() => showAllHomeRecords = true), textInputAction: TextInputAction.search, decoration: InputDecoration(hintText: 'नाम, पिता / पति का नाम या मतदाता ID खोजें…', prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF1685DF), size: 25), suffixIcon: search.text.isEmpty ? null : IconButton(tooltip: 'खोज साफ़ करें', onPressed: () { search.clear(); setState(() => showAllHomeRecords = false); }, icon: const Icon(Icons.close_rounded)), filled: true, fillColor: dark ? const Color(0xFFF5F8FC) : Colors.white, hintStyle: const TextStyle(color: Color(0xFF7588A2), fontSize: 13), contentPadding: const EdgeInsets.symmetric(vertical: 17), border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)), style: const TextStyle(color: Color(0xFF152A42), fontWeight: FontWeight.w600)),
               const SizedBox(height: 11),
               Row(children: [
                 Expanded(child: OutlinedButton.icon(onPressed: _showFilters, icon: const Icon(Icons.location_on_rounded, size: 18), label: Text(ward == 'All wards' ? 'सभी वार्ड' : 'वार्ड $ward', maxLines: 1, overflow: TextOverflow.ellipsis), style: OutlinedButton.styleFrom(foregroundColor: dark ? Colors.white : const Color(0xFF174A85), side: BorderSide(color: dark ? const Color(0xFF47749D) : const Color(0xFFB8D4F0)), minimumSize: const Size(0, 44), shape: const StadiumBorder()))),
